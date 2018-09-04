@@ -84,7 +84,7 @@ mangoHttpClient_t *mango_sslconnect(char* serverIP, uint16_t serverPort, ssl_ca_
 	{
 		SSL_CTX_set_verify(hc->ctx, SSL_VERIFY_NONE, NULL);
 	}
-	SSL_CTX_set_default_read_buffer_len(hc->ctx, frag_len);
+	// SSL_CTX_set_default_read_buffer_len(hc->ctx, frag_len);
 
 	// socket
 	hc->socketfd = mangoPort_connect(serverIP, serverPort, MANGO_SOCKET_CONNECT_TIMEOUT_MS);
