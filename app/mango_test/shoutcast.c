@@ -27,19 +27,20 @@
 
 
 
+
 /*
-* This example performs a GET HTTP request followed by a HEAD HTTP request
-* in an infinite while(1) loop to demonstrate HTTP peristent conenctions.
+* This example demostrates Shoutcast Internet radio. Just for testing..
 * 
-* The target URL is the home page of stackoverflow (http://stackoverflow.com/)
+* The target URL is Hitradio OE3 internet radio station. The received data
+* could be saved to the disk or sent for playback.
 */
-#define SERVER_IP           "198.252.206.140"
-#define SERVER_HOSTNAME     "stackoverflow.com"
-#define SERVER_PORT         80
-#define RESOURCE_URL        "/post.php"
+#define SERVER_IP           "194.232.200.156"
+#define SERVER_HOSTNAME     "194.232.200.156:8000"
+#define SERVER_PORT         8000
+#define RESOURCE_URL        "/;?icy=http"
 
-
-mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs){
+static mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs)
+{
 	mangoErr_t err;
     
 	switch(mangoArgs->argType){
@@ -92,7 +93,7 @@ mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs){
 			PRINTF("-----------------------------------------------------------------\r\n");
 			PRINTF("HTTP DATA RECEIVED: [%u bytes]\r\n", mangoArgs->buflen);
 			PRINTF("-----------------------------------------------------------------\r\n");
-			PRINTF("%s\r\n", mangoArgs->buf);
+			//PRINTF("%s\r\n", mangoArgs->buf);
 			PRINTF("-----------------------------------------------------------------\r\n");
 			
             break;
@@ -139,60 +140,23 @@ mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs){
     return MANGO_OK;
 };
 
-mangoErr_t httpHead(mangoHttpClient_t* httpClient){
+
+static mangoErr_t httpGet(mangoHttpClient_t* httpClient){
     mangoErr_t err;
 
     /*
-    * http://httpbin.org/ allows to test GET requests which return CHUNKED data
-	* in reponse..
-    */
-    err = mango_httpRequestNew(httpClient, RESOURCE_URL,  MANGO_HTTP_METHOD_HEAD);
-    if(err != MANGO_OK){ return MANGO_ERR; }
-    
-    /*
-    * The "host: xxxx" header is required by almost all servers so we need
-    * to add it.
-    */
-    err = mango_httpHeaderSet(httpClient, MANGO_HDR__HOST, SERVER_HOSTNAME);
-    if(err != MANGO_OK){ return MANGO_ERR; }
-    
-    /*
-    * Add this if it is desirable to continue with other HTTP requests after
-    * the current one without closing the existing connection.
-    */
-    err = mango_httpHeaderSet(httpClient, MANGO_HDR__CONNECTION, "keep-alive");
-    if(err != MANGO_OK){ return MANGO_ERR; }
-    
-    /*
-    * Send the HTTP request and receive the response
-    */
-    err = mango_httpRequestProcess(httpClient, mangoApp_handler, NULL);
-    if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){
-		/*
-		* A valid HTTP response was received.
-		*/
-        return err;
-    }else{
-		/*
-		* Fatal request error
-        */
-		return MANGO_ERR;
-    }
-    
-    
-    return MANGO_ERR;
-}
-
-mangoErr_t httpGet(mangoHttpClient_t* httpClient){
-    mangoErr_t err;
-
-    /*
-    * http://httpbin.org/ allows to test GET requests which return CHUNKED data
-	* in reponse..
+    * Select if a GET or HEAD request will be sent
     */
     err = mango_httpRequestNew(httpClient, RESOURCE_URL,  MANGO_HTTP_METHOD_GET);
+    //err = mango_httpRequestNew(httpClient, RESOURCE_URL,  MANGO_HTTP_METHOD_HEAD);
     if(err != MANGO_OK){ return MANGO_ERR; }
     
+	/*
+	* If Basic Access Authentication is needed enable this..
+	*/
+	//err = mango_httpAuthSet(httpClient, MANGO_HTTP_AUTH__BASIC, "admin", "admin");
+	if(err != MANGO_OK){ return MANGO_ERR; }
+	
     /*
     * The "host: xxxx" header is required by almost all servers so we need
     * to add it.
@@ -213,14 +177,13 @@ mangoErr_t httpGet(mangoHttpClient_t* httpClient){
     err = mango_httpRequestProcess(httpClient, mangoApp_handler, NULL);
     if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){
 		/*
-		* A valid HTTP response was received.
+		* A valid HTTP response was received..
 		*/
         return err;
     }else{
-		/*
+        /*
 		* Fatal request error
         */
-		return MANGO_ERR;
     }
     
     
@@ -229,7 +192,8 @@ mangoErr_t httpGet(mangoHttpClient_t* httpClient){
 
 
 
-int main(){
+int shoutcast_test(void)
+{
     mangoHttpClient_t* httpClient;
     mangoErr_t err;
     
@@ -241,60 +205,30 @@ int main(){
         PRINTF("mangoHttpClient_connect() FAILED!");
         return MANGO_ERR;
     }
-   
+    
     /*
-    * Enter an infinite loop making a GET followed by a HEAD request
-    * using the same HTTP connection (HTTP persistent connection)
+    * Do the HTTP GET 
     */
-    while(1){
-        
+    err = httpGet(httpClient);
+    if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){ 
         /*
-        * Do the HTTP GET 
+        * HTTP request recognized by the server, err stores the 
+        * final HTTP response status code. It may be a 200 or
+        * any other status code. 
+        *
+        * NOTE: At this point the status of the HTTP session is healthy
+        * and we can continue sending other HTTP request without
+        * closing the HTTP connection. It is possible to call httpGet()
+        * again or to continue with new POST/PUT/GET/HEAD requests.
         */
-        err = httpGet(httpClient);
-        if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){ 
-            /*
-            * HTTP request completed succesfully, go on
-            */
-            PRINTF("HTTP response code was %d\r\n", err);
-        }else {
-            /*
-            * Fatal request error, should disconnect
-            */
-            PRINTF("HTTP request failed with error %d\r\n", err);
-            break;
-        }
-        
+        PRINTF("HTTP response code was %d\r\n", err);
+    }
+    else {
         /*
-        * Don't set this too high because server may close the connection
-        * due to inactivity
+        * Fatal error during the GET request (working buffer was small or connection was closed). 
+        * At this point mango_disconnect() should be called. 
         */
-        mangoPort_sleep(800);
-        
-        
-        /*
-        * Do the HTTP HEAD 
-        */
-        err = httpHead(httpClient);
-        if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){ 
-            /*
-            * HTTP request completed succesfully, go on
-            */
-            PRINTF("HTTP response code was %d\r\n", err);
-        }else {
-            /*
-            * Fatal request error, should disconnect
-            */
-            PRINTF("HTTP request failed with error %d\r\n", err);
-            break;
-        }
-        
-        
-        /*
-        * Don't set this too high because server may close the connection
-        * due to inactivity
-        */
-        mangoPort_sleep(800);
+        PRINTF("HTTP request failed!\r\n");
     }
     
     /*

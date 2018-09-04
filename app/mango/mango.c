@@ -45,8 +45,73 @@ mangoHttpClient_t* mango_connect(char* serverIP, uint16_t serverPort){
     
     return hc;
 }
- 
- 
+
+mangoHttpClient_t *mango_sslconnect(char* serverIP, uint16_t serverPort, ssl_ca_crt_key_t *ssl_cck, const SSL_METHOD *method, int verify_mode, int frag_len)
+{
+    mangoHttpClient_t *hc;
+    
+    MANGO_ENSURE(serverIP, ("?") );
+    
+    hc = mangoPort_malloc(sizeof(mangoHttpClient_t));
+    if(!hc){
+        return NULL;
+    }else{
+        memset(hc, 0, sizeof(mangoHttpClient_t));
+    }
+	hc->secure = 1;
+	// ssl ctx
+	if ((hc->ctx = SSL_CTX_new(method)) == NULL)
+		goto failed;
+	if (ssl_cck->cacrt)
+	{
+		X509 *cacrt = d2i_X509(NULL, (const unsigned char **)&ssl_cck->cacrt, ssl_cck->cacrt_len);
+		if (cacrt == NULL)
+			goto failed1;
+		SSL_CTX_add_client_CA(hc->ctx, cacrt);
+	}
+	if (ssl_cck->cert && ssl_cck->key)
+	{
+		if (0 == SSL_CTX_use_certificate_ASN1(hc->ctx, ssl_cck->cert_len, ssl_cck->cert))
+			goto failed1;
+		if (0 == SSL_CTX_use_PrivateKey_ASN1(0, hc->ctx, ssl_cck->key, ssl_cck->key_len))
+			goto failed1;
+	}
+	if (ssl_cck->cacrt)
+	{
+		SSL_CTX_set_verify(hc->ctx, verify_mode, NULL);
+	}
+	else
+	{
+		SSL_CTX_set_verify(hc->ctx, SSL_VERIFY_NONE, NULL);
+	}
+	SSL_CTX_set_default_read_buffer_len(hc->ctx, frag_len);
+
+	// socket
+	hc->socketfd = mangoPort_connect(serverIP, serverPort, MANGO_SOCKET_CONNECT_TIMEOUT_MS);
+	if(hc->socketfd < 0)
+		goto failed2;
+	
+	// SSL connect
+	if ((hc->ssl = SSL_new(hc->ctx)) == NULL)
+		goto failed2;
+	SSL_set_fd(hc->ssl, hc->socketfd);
+	if (-1 == SSL_connect(hc->ssl))
+		goto failed3;
+
+    mangoSM_INIT(hc);
+    return hc;
+
+failed3:
+	SSL_free(hc->ssl);
+failed2:
+	close(hc->socketfd);
+failed1:
+	SSL_CTX_free(hc->ctx);
+failed:
+	mangoPort_free(hc);
+	return NULL;
+}
+
 mangoErr_t mango_httpRequestNew(mangoHttpClient_t* hc, char* URI, mangoHttpMethod_e method){
     char* token;
     uint16_t tokenlen;
@@ -352,6 +417,13 @@ void mango_disconnect(mangoHttpClient_t* hc){
 	MANGO_ENSURE(hc, ("?") );
 	
 	mangoPort_disconnect(hc->socketfd);
+	
+	mangoPort_free(hc);
+}
+void mango_ssldisconnect(mangoHttpClient_t* hc){
+	MANGO_ENSURE(hc, ("?") );
+	
+	mangoPort_ssldisconnect(hc);
 	
 	mangoPort_free(hc);
 }

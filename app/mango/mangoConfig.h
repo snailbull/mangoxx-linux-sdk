@@ -47,7 +47,7 @@
 * that needs a bigger WB size to be handled, mango is going to exit with
 * an error code MANGO_ERR_WORKBUFSMALL.
 */
-#define MANGO_WORKING_BUFFER_SZ     		(768)
+#define MANGO_WORKING_BUFFER_SZ     		(4096)
 
 /*
 * Defines the maximum period of time (in miliseconds) that mango is going to wait 
