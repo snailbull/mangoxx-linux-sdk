@@ -1063,7 +1063,14 @@ int mangoSocket_read(mangoHttpClient_t* hc, uint8_t* data, uint16_t datalen, uin
     
     if(!timeout) {timeout = 1;}
     
-    retval = mangoPort_read(hc->socketfd, data, datalen, timeout);
+	if (hc->secure == 0)
+	{
+    	retval = mangoPort_read(hc->socketfd, data, datalen, timeout);
+	}
+	else
+	{
+		retval = mangoPort_sslread(hc, data, datalen, timeout);
+	}
     if(retval <= 0){
         
     }else{
@@ -1079,7 +1086,14 @@ int mangoSocket_write(mangoHttpClient_t* hc, uint8_t* data, uint16_t datalen, ui
     
     if(!timeout) {timeout = 1;}
     
-    retval = mangoPort_write(hc->socketfd, data, datalen, timeout);
+	if (hc->secure == 0)
+	{
+    	retval = mangoPort_write(hc->socketfd, data, datalen, timeout);
+	}
+	else
+	{
+		retval = mangoPort_sslwrite(hc, data, datalen, timeout);
+	}
     if(retval <= 0){
         
     }else{

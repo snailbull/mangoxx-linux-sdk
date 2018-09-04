@@ -233,7 +233,6 @@ void mangoPort_disconnect(int socketfd){
 	close(socketfd);
 }
 
-
 /**
  * @brief   Connect to the specified IP address and port. Wait until at least 
  *          for at most "timeout" [miliseconds] until the connection is established,
@@ -270,4 +269,214 @@ int mangoPort_connect(char* serverIP, uint16_t serverPort, uint32_t timeout){
     }
 }
 
+/**
+ * ssl
+ */
+int mangoPort_sslread(mangoHttpClient_t *hc, uint8_t* data, uint16_t datalen, uint32_t timeout){
+    uint32_t received;
+    uint32_t start;
+    int socketerror;
+    int retval;
+	
+    MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("Trying to read %u bytes\r\n", datalen) );
+    
+    received = 0;
+    start = mangoPort_timeNow();
+	while(received < datalen){
+        retval = SSL_read(hc->ssl, &data[received], datalen - received);
+        //printf("READ %d\r\n", retval);
+        if(retval < 0){
+            //socketerrorlen = sizeof(socketerror);
+            //retval = getsockopt(socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
+#ifdef MANGO_IP_ENV__UNIX
+            socketerror = errno;
+#endif
+            
+#ifdef MANGO_IP_ENV__LWIP
+            socklen_t socketerrorlen;
+            socketerrorlen = sizeof(socketerror);
+            retval = getsockopt(hc->socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
+#endif
+            
+            MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("!!!!!!! READ SOCKET ERROR %d\r\n", socketerror) );
+            
+            if(socketerror == EWOULDBLOCK || socketerror == EAGAIN){
+                mangoPort_sleep(64);
+            }else{
+                return -1;
+            }
+        }else{
+            received += retval;
+            return received;
+        }
+        
+        if(mangoHelper_elapsedTime(start) > timeout){
+            return received;
+        }
+	}
+	
+	MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("%u bytes read\r\n", retval) );
+	
+	return retval;
+}
 
+int mangoPort_sslwrite(mangoHttpClient_t *hc, uint8_t* data, uint16_t datalen, uint32_t timeout){
+    uint32_t sent;
+    uint32_t start;
+    int socketerror;
+    int retval;
+    
+	MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("Trying to write %u bytes\r\n", datalen) );
+	
+    sent = 0;
+    start = mangoPort_timeNow();
+    while(sent < datalen){
+        retval = SSL_write(hc->ssl, &data[sent], datalen - sent);
+        if(retval < 0){
+            //socketerrorlen = sizeof(socketerror);
+            //retval = getsockopt(socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
+#ifdef MANGO_IP_ENV__UNIX
+            socketerror = errno;
+#endif
+            
+#ifdef MANGO_IP_ENV__LWIP
+            socklen_t socketerrorlen;
+            socketerrorlen = sizeof(socketerror);
+            retval = getsockopt(hc->socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
+#endif
+            
+            MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("!!!!!!! WRITE SOCKET ERROR %d\r\n", socketerror) );
+            
+            if(socketerror == EWOULDBLOCK || socketerror == EAGAIN){
+                mangoPort_sleep(64);
+            }else{
+                return -1;
+            }
+        }else{
+            sent += retval;
+        }
+        
+        if(mangoHelper_elapsedTime(start) > timeout){
+            return sent;
+        }
+    };
+    
+    return sent;
+}
+
+void mangoPort_ssldisconnect(mangoHttpClient_t *hc)
+{
+	shutdown(hc->socketfd, SHUT_RDWR);
+    close(hc->socketfd);
+	SSL_free(hc->ssl);
+    SSL_CTX_free(hc->ctx);
+}
+
+/**
+ * cert file load
+ */
+ssl_ca_crt_key_t *sslcert_load(char *cacrt, char *cert, char *key)
+{
+	ssl_ca_crt_key_t *file;
+	struct stat s;
+	int fd;
+	int n, br;
+
+	file = (ssl_ca_crt_key_t*)malloc(sizeof(ssl_ca_crt_key_t));
+	if (file == NULL)
+		return NULL;
+	memset(file, 0, sizeof(ssl_ca_crt_key_t));
+
+	if (cacrt)
+	{
+		fd = open(cacrt, O_RDONLY);
+		if (fd < 0)
+			goto failed;
+		fstat(fd, &s);
+		file->cacrt_len = s.st_size;
+		file->cacrt = (uint8_t*)malloc(s.st_size+8);
+		if (file->cacrt == NULL)
+			goto failed1;
+		n = 0;
+		while ((br = read (fd, (void*)(file->cacrt+n), 1024)) > 0)
+		{
+			n += br;
+		}
+		close(fd);
+	}
+
+	if (cert)
+	{
+		fd = open(cert, O_RDONLY);
+		if (fd < 0)
+			goto failed2;
+		fstat(fd, &s);
+		file->cert_len = s.st_size;
+		file->cert = (uint8_t*)malloc(s.st_size+8);
+		if (file->cert == NULL)
+			goto failed2;
+		n = 0;
+		while ((br = read (fd, file->cert+n, 1024)) > 0)
+		{
+			n += br;
+		}
+		close(fd);
+	}
+
+	if (key)
+	{
+		fd = open(key, O_RDONLY);
+		if (fd < 0)
+			goto failed3;
+		fstat(fd, &s);
+		file->key_len = s.st_size;
+		file->key = (uint8_t*)malloc(s.st_size+8);
+		if (file->key == NULL)
+			goto failed3;
+		n = 0;
+		while ((br = read (fd, file->key+n, 1024)) > 0)
+		{
+			n += br;
+		}
+		close(fd);
+	}
+
+	return file;
+
+failed3:
+	if (file->cert)
+		free(file->cert);
+failed2:
+	if (file->cacrt)
+		free((void*)(file->cacrt));
+failed1:
+	close(fd);
+failed:
+	if (file)
+		free(file);
+	return NULL;
+}
+
+void sslcert_free(ssl_ca_crt_key_t *s)
+{
+	if (s->cacrt)
+	{
+		free((void*)(s->cacrt));
+		s->cacrt = 0;
+	}
+	if (s->cert)
+	{
+		free(s->cert);
+		s->cert = 0;
+	}
+	if (s->key)
+	{
+		free(s->key);
+		s->key = 0;
+	}
+	if (s)
+	{
+		free(s);
+		s = 0;
+	}
+}

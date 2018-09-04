@@ -21,48 +21,27 @@
  * npoulokefalos@gmail.com
 */
 
-
 #include "mango.h"
 
 #define PRINTF              printf
 
 
 
-
 /*
-* This example demonstrates HTTP POST, chunked POST and POST requests with status code expectation.
-* PUT requests are similar.
+* This example performs a GET HTTP request followed by a HEAD HTTP request
+* in an infinite while(1) loop to demonstrate HTTP peristent conenctions.
 * 
-* The target URL is Henry's HTTP Post Dumping Server (HTTP test endpoint)
-* (http://www.posttestserver.com/)
+* The target URL is the home page of stackoverflow (http://stackoverflow.com/)
 */
-
-#define SERVER_IP           "67.205.27.203"
-#define SERVER_HOSTNAME     "posttestserver.com"
+#define SERVER_IP           "198.252.206.140"
+#define SERVER_HOSTNAME     "stackoverflow.com"
 #define SERVER_PORT         80
 #define RESOURCE_URL        "/post.php"
 
-/*
-* Defines the size of the virtual file to be posted
-*/
-#define FILE_SZ             (1 * 1024)
 
-/*
-* Define this to do a chunked POST
-*/
-#define DO_CHUNKED_POST
-
-/*
-* Define this to add an "Expect" header to the request
-*/
-#define USE_EXPECT_100_CONTINUE
-
-
-
-mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs){
+static mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs)
+{
 	mangoErr_t err;
-    
-    (void) err;
     
 	switch(mangoArgs->argType){
 		case MANGO_ARG_TYPE_HTTP_REQUEST_READY:
@@ -148,7 +127,7 @@ mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs){
         case MANGO_ARG_TYPE_WEBSOCKET_PING:
         {
 			/*
-            * Server sent a Ping frame and a pong frame was sent automatically.
+            * Server sent us a Ping frame and a pong frame was sent automatically.
             */
             PRINTF("\r\n");
 			PRINTF("-----------------------------------------------------------------\r\n");
@@ -161,20 +140,20 @@ mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs){
     return MANGO_OK;
 };
 
-
-mangoErr_t httpPost(mangoHttpClient_t* httpClient){
+static mangoErr_t httpHead(mangoHttpClient_t* httpClient)
+{
     mangoErr_t err;
-    static uint8_t buffer[128];
-    char fileSz[11];
-    uint32_t sent, sendnow;
-    
-    (void) fileSz;
-    
-    err = mango_httpRequestNew(httpClient, RESOURCE_URL,  MANGO_HTTP_METHOD_POST);
+
+    /*
+    * http://httpbin.org/ allows to test GET requests which return CHUNKED data
+	* in reponse..
+    */
+    err = mango_httpRequestNew(httpClient, RESOURCE_URL,  MANGO_HTTP_METHOD_HEAD);
     if(err != MANGO_OK){ return MANGO_ERR; }
     
     /*
-    * The "host: xxxx" header is required by almost all servers so we should add it
+    * The "host: xxxx" header is required by almost all servers so we need
+    * to add it.
     */
     err = mango_httpHeaderSet(httpClient, MANGO_HDR__HOST, SERVER_HOSTNAME);
     if(err != MANGO_OK){ return MANGO_ERR; }
@@ -186,97 +165,75 @@ mangoErr_t httpPost(mangoHttpClient_t* httpClient){
     err = mango_httpHeaderSet(httpClient, MANGO_HDR__CONNECTION, "keep-alive");
     if(err != MANGO_OK){ return MANGO_ERR; }
     
-#ifdef DO_CHUNKED_POST
     /*
-    * The "Transfer-Encoding: chunked" HTTP header will notify mango that this is 
-    * a Chunked HTTP POST. The actual size of the POST is not yet known. When the 
-    * whole file has been sent a final mango_httpHeaderSet() call with
-    * buffer NULL and buflen 0 should be made. This will notify the internal State machine
-    * that all data have been sent and the application is ready to accept the HTTP response.
-    */
-    err = mango_httpHeaderSet(httpClient, MANGO_HDR__TRANSFER_ENCODING, "chunked");
-    if(err != MANGO_OK){ return MANGO_ERR; }
-#else
-    /*
-    * The "Content-Length: xxxx" HTTP header will notify mango that this is 
-    * a normal (Non-Chunked) HTTP POST. This header specifies actual size of the POST.  
-    * When the whole file has been sent a final mango_httpHeaderSet() call with
-    * buffer NULL and buflen 0 should be made. This will notify the internal State machine
-    * that all data have been sent and the application is ready to accept the HTTP response.
-    */
-    mangoHelper_dec2decstr(FILE_SZ, fileSz);
-    err = mango_httpHeaderSet(httpClient, MANGO_HDR__CONTENT_LENGTH, fileSz);
-    if(err != MANGO_OK){ return MANGO_ERR; }
-#endif
-    
-#ifdef USE_EXPECT_100_CONTINUE
-    /*
-    * To verify that the server is going to accept the POST data without
-    * first sending them, use the "Expect: 100-Continue" header. If
-    * the server is not willing to accept the POST/PUT request, it will reply
-    * with a 417 Epectation failed status code. This may happen if for example
-    * the HTTP headers/URL are not correct. If the HTTP request headers are corrent
-    * a "100 Continue" HTTP response will be sent from the server and the application 
-    * can start sending the actual POST data.
-    *
-    * Note: The "Expect" header may not be supported from the target server, so
-    * if any strange behaviour is observed it should be disabled.
-    */
-    err = mango_httpHeaderSet(httpClient, MANGO_HDR__EXPECT, "100-Continue");
-    if(err != MANGO_OK){ return MANGO_ERR; }
-#endif
-
-    /*
-    * Send the HTTP request
+    * Send the HTTP request and receive the response
     */
     err = mango_httpRequestProcess(httpClient, mangoApp_handler, NULL);
     if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){
-        if(err == MANGO_ERR_HTTP_100){
-            /*
-            * Server is ready to accept the HTTP body, send it
-            */
-            sent = 0;
-            while(sent != FILE_SZ){
-                sendnow = FILE_SZ - sent > sizeof(buffer) ? sizeof(buffer) : FILE_SZ - sent;
-
-                err = mango_httpDataSend(httpClient, buffer, sendnow);
-                if(err != MANGO_OK){ return MANGO_ERR; } /* If we sent more data than specified in the "Content-Length" field.. */
-                
-                sent += sendnow;
-                PRINTF("POSTED %u/%u bytes..\r\n",sent, FILE_SZ);
-                //mangoPort_sleep(500);
-            };
-            
-            /*
-            * Notify that all POST data have been sent
-            */
-            err = mango_httpDataSend(httpClient, NULL, 0);
-            if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){
-                /*
-                * HTTP POST finished, err stores the actual HTTP status code
-                */
-                return err; 
-            }else{ 
-                /* If we sent less data than specified in the  "Content-Length" field.. */
-                return MANGO_ERR; 
-            } 
-
-        }else{
-            /*
-            * We got a non-success status code from the server before executing the
-            * actual POST. For example server may responded with a "417 Expectation Failed" if
-            * the request headers or target URL were invalid.
-            */
-            return err;
-        }
+		/*
+		* A valid HTTP response was received.
+		*/
+        return err;
+    }else{
+		/*
+		* Fatal request error
+        */
+		return MANGO_ERR;
     }
+    
+    
+    return MANGO_ERR;
+}
+
+static mangoErr_t httpGet(mangoHttpClient_t* httpClient)
+{
+    mangoErr_t err;
+
+    /*
+    * http://httpbin.org/ allows to test GET requests which return CHUNKED data
+	* in reponse..
+    */
+    err = mango_httpRequestNew(httpClient, RESOURCE_URL,  MANGO_HTTP_METHOD_GET);
+    if(err != MANGO_OK){ return MANGO_ERR; }
+    
+    /*
+    * The "host: xxxx" header is required by almost all servers so we need
+    * to add it.
+    */
+    err = mango_httpHeaderSet(httpClient, MANGO_HDR__HOST, SERVER_HOSTNAME);
+    if(err != MANGO_OK){ return MANGO_ERR; }
+    
+    /*
+    * Add this if it is desirable to continue with other HTTP requests after
+    * the current one without closing the existing connection.
+    */
+    err = mango_httpHeaderSet(httpClient, MANGO_HDR__CONNECTION, "keep-alive");
+    if(err != MANGO_OK){ return MANGO_ERR; }
+    
+    /*
+    * Send the HTTP request and receive the response
+    */
+    err = mango_httpRequestProcess(httpClient, mangoApp_handler, NULL);
+    if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){
+		/*
+		* A valid HTTP response was received.
+		*/
+        return err;
+    }else{
+		/*
+		* Fatal request error
+        */
+		return MANGO_ERR;
+    }
+    
     
     return MANGO_ERR;
 }
 
 
 
-int main(){
+int persistent_test(void)
+{
     mangoHttpClient_t* httpClient;
     mangoErr_t err;
     
@@ -288,31 +245,60 @@ int main(){
         PRINTF("mangoHttpClient_connect() FAILED!");
         return MANGO_ERR;
     }
-    
+   
     /*
-    * Do the HTTP POST 
+    * Enter an infinite loop making a GET followed by a HEAD request
+    * using the same HTTP connection (HTTP persistent connection)
     */
-    err = httpPost(httpClient);
-    if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){ 
+    while(1){
+        
         /*
-        * HTTP request recognized by the server, err stores the 
-        * final HTTP response status code. It may be a 200 or
-        * any other status code. 
-        * 
-        * NOTE: At this point the status of the HTTP session is healthy
-        * and we can continue sending other HTTP request without closing 
-        * the HTTP connection (persistent connection). It is possible to call 
-        * httpPost() again or  continue with a new POST/PUT/GET/HEAD request.
+        * Do the HTTP GET 
         */
-        PRINTF("HTTP response code was %d\r\n", err);
-    }
-    else {
+        err = httpGet(httpClient);
+        if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){ 
+            /*
+            * HTTP request completed succesfully, go on
+            */
+            PRINTF("HTTP response code was %d\r\n", err);
+        }else {
+            /*
+            * Fatal request error, should disconnect
+            */
+            PRINTF("HTTP request failed with error %d\r\n", err);
+            break;
+        }
+        
         /*
-        * Fatal error during the POST operation (application sent more or less data than 
-        * needed, or a socket Tx failed due to socket disconnection, or the 
-        * working buffer was small..). At this point mango_disconnect() should be called.
+        * Don't set this too high because server may close the connection
+        * due to inactivity
         */
-        PRINTF("HTTP request failed!\r\n");
+        mangoPort_sleep(800);
+        
+        
+        /*
+        * Do the HTTP HEAD 
+        */
+        err = httpHead(httpClient);
+        if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){ 
+            /*
+            * HTTP request completed succesfully, go on
+            */
+            PRINTF("HTTP response code was %d\r\n", err);
+        }else {
+            /*
+            * Fatal request error, should disconnect
+            */
+            PRINTF("HTTP request failed with error %d\r\n", err);
+            break;
+        }
+        
+        
+        /*
+        * Don't set this too high because server may close the connection
+        * due to inactivity
+        */
+        mangoPort_sleep(800);
     }
     
     /*

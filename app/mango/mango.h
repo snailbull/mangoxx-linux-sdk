@@ -42,6 +42,18 @@
 #define MANGO_HDR__WWW_AUTHENTICATE 	"WWW-Authenticate"
 #define MANGO_HDR__AUTHORIZATION 		"Authorization"
 
+typedef struct ssl_ca_crt_key
+{
+    unsigned char *cacrt;
+    unsigned int cacrt_len;
+    unsigned char *cert;
+    unsigned int cert_len;
+    unsigned char *key;
+    unsigned int key_len;
+} ssl_ca_crt_key_t;
+
+ssl_ca_crt_key_t *sslcert_load(char *cacrt, char *cert, char *key);
+void sslcert_free(ssl_ca_crt_key_t *s);
 
 /**
  * @brief  Connectes to the specified HTTP Server
@@ -49,6 +61,7 @@
  * @retval NULL         If the conenction failed to be established
  */
 mangoHttpClient_t*  mango_connect(char* serverIP, uint16_t serverPort);
+mangoHttpClient_t *mango_sslconnect(char* serverIP, uint16_t serverPort, ssl_ca_crt_key_t *ssl_cck, const SSL_METHOD *method, int verify_mode, int frag_len);
 
 /**
  * @brief  Creates an new HTTP request
@@ -149,9 +162,6 @@ mangoErr_t 			mango_wsClose(mangoHttpClient_t* hc);
  * @brief   Closes any active HTTP connection and releases any memory resources
  */
 void                mango_disconnect(mangoHttpClient_t* hc);
-
-
-
-
+void                mango_ssldisconnect(mangoHttpClient_t* hc);
 
 #endif

@@ -25,8 +25,11 @@
 #define __MANGO_TYPES_H__
 
 #include <stdint.h>         /* uint32_t, ... */
+#include <stddef.h>
+#include <openssl/ssl.h>
 
 #include "mangoConfig.h"
+
 
 typedef enum{
 	MANGO_HTTP_AUTH__BASIC,
@@ -218,6 +221,9 @@ typedef struct mangoHttpClient_t mangoHttpClient_t;
 
 struct mangoHttpClient_t{
     int                     socketfd;
+	SSL_CTX					*ctx;
+	SSL						*ssl;
+	uint8_t					secure;
     mangoHttpMethod_e       httpMethod;
 
 	uint16_t				httpResponseStatusCode;

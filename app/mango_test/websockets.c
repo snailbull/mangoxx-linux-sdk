@@ -25,21 +25,22 @@
 
 #define PRINTF              printf
 
-
-
-
 /*
-* This example demonstrates Basic Access Authentication HTTP requests
+* This example demonstrates Websockets.
 * 
-* The target URL is the local Access Point..
+* The target URL is websocket.org (Websocket test endpoint, echoes back whatever we send)
+* (http://www.posttestserver.com/)
 */
-#define SERVER_IP           "192.168.2.4"
-#define SERVER_HOSTNAME     "192.168.2.4"
-#define SERVER_PORT         80
-#define RESOURCE_URL        "/" 
 
-mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs){
-	mangoErr_t err;
+#define SERVER_IP           "174.129.224.73"
+#define SERVER_HOSTNAME     "echo.websocket.org"
+#define SERVER_PORT         80
+
+
+
+static mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs)
+{
+    mangoErr_t err;
     
 	switch(mangoArgs->argType){
 		case MANGO_ARG_TYPE_HTTP_REQUEST_READY:
@@ -139,58 +140,104 @@ mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs){
 };
 
 
-mangoErr_t httpGet(mangoHttpClient_t* httpClient){
+static mangoErr_t testWebsocket(mangoHttpClient_t* httpClient)
+{
     mangoErr_t err;
-
+    char* msg;
+ 
     /*
-    * Select if a GET or HEAD request will be sent
-    */
-    err = mango_httpRequestNew(httpClient, RESOURCE_URL,  MANGO_HTTP_METHOD_GET);
-    //err = mango_httpRequestNew(httpClient, RESOURCE_URL,  MANGO_HTTP_METHOD_HEAD);
-    if(err != MANGO_OK){ return MANGO_ERR; }
-    
+	* Specify HTTP request's basic headers
+	*/
+	err = mango_httpRequestNew(httpClient, "/",  MANGO_HTTP_METHOD_GET);
+	if(err != MANGO_OK){ return MANGO_ERR; }
+	
 	/*
 	* If Basic Access Authentication is needed enable this..
 	*/
-	err = mango_httpAuthSet(httpClient, MANGO_HTTP_AUTH__BASIC, "Cisco", "Cisco");
+	//err = mango_httpAuthSet(httpClient, MANGO_HTTP_AUTH__BASIC, "admin", "admin");
 	if(err != MANGO_OK){ return MANGO_ERR; }
 	
-    /*
-    * The "host: xxxx" header is required by almost all servers so we need
-    * to add it.
-    */
-    err = mango_httpHeaderSet(httpClient, MANGO_HDR__HOST, SERVER_HOSTNAME);
-    if(err != MANGO_OK){ return MANGO_ERR; }
-    
-    /*
-    * Add this if it is desirable to continue with other HTTP requests after
-    * the current one without closing the existing connection.
-    */
-    err = mango_httpHeaderSet(httpClient, MANGO_HDR__CONNECTION, "keep-alive");
-    if(err != MANGO_OK){ return MANGO_ERR; }
-    
-    /*
-    * Send the HTTP request and receive the response
-    */
-    err = mango_httpRequestProcess(httpClient, mangoApp_handler, NULL);
-    if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){
+	err = mango_httpHeaderSet(httpClient, MANGO_HDR__HOST, SERVER_HOSTNAME);
+	if(err != MANGO_OK){ return MANGO_ERR; }	
+
+	err = mango_httpHeaderSet(httpClient, MANGO_HDR__ORIGIN, "http://www.websocket.org");
+	if(err != MANGO_OK){ return MANGO_ERR; }
+	
+	err = mango_httpHeaderSet(httpClient, MANGO_HDR__WEB_SOCKET_VERSION, "13");
+	if(err != MANGO_OK){ return MANGO_ERR; }
+	
+	err = mango_httpHeaderSet(httpClient, MANGO_HDR__CONNECTION, "Keep-alive, Upgrade");
+	if(err != MANGO_OK){ return MANGO_ERR; }
+	
+	err = mango_httpHeaderSet(httpClient, MANGO_HDR__WEB_SOCKET_PROTOCOL, "wamp");
+	if(err != MANGO_OK){ return MANGO_ERR; }	
+	
+	err = mango_httpHeaderSet(httpClient, MANGO_HDR__WEB_SOCKET_KEY, "v6H3B7uxxRf1NfPeeaDHiQ==");
+	if(err != MANGO_OK){ return MANGO_ERR; }
+	
+	err = mango_httpHeaderSet(httpClient, MANGO_HDR__UPGRADE, "websocket");
+	if(err != MANGO_OK){ return MANGO_ERR; }
+	
+
+	/*
+	* Send HTTP request and receive the response
+	*/
+	err = mango_httpRequestProcess(httpClient, mangoApp_handler, NULL);
+	if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){
+		if(err != MANGO_ERR_HTTP_101){
+			/*
+			* HTTP upgrade to websockets failed, possibly due to wrong headers
+            * or because the server does not support them
+			*/
+			return err;
+		}else{
+			/*
+			* HTTP upgrade to websockets succeed. Enter an infinite loop
+			* waiting for new frames and sending new ones.
+			*/
+			while(1){
+				/*
+				* Block for the specified amount of time and Poll for received data 
+                * or control (Ping, Close) frames.
+				*/
+                PRINTF("Polling..\r\n");
+				err = mango_wsPoll(httpClient, 2000);
+				if(err != MANGO_OK){ return MANGO_ERR; } /* Connection closed by remote peer / socket disconnected / we got an invalid frame.. */
+				
+				/*
+				* Send some frames to the server. They should be echoed back to us through the 
+                * mangoApp_handler() callback.
+				*/
+                msg = "Hello from mango!";
+				err = mango_wsFrameSend(httpClient, (uint8_t*) msg, strlen(msg), MANGO_WS_FRAME_TYPE_TEXT);
+				if(err != MANGO_OK){ return MANGO_ERR; } /* Connection error, abort */
+                
+                msg = "This is a test message";
+				err = mango_wsFrameSend(httpClient, (uint8_t*) msg, strlen(msg), MANGO_WS_FRAME_TYPE_TEXT);
+				if(err != MANGO_OK){ return MANGO_ERR; } /* Connection error, abort */
+			}
+			
+			/*
+			* When we finish close the connection
+			*/
+			mango_wsClose(httpClient);
+			
+			return MANGO_OK;
+		}
+	}else{
 		/*
-		* A valid HTTP response was received..
+		* Fatal request error (Connection closed or working buffer was small
+		* and we couldn't to process the HTPP request/response.
 		*/
-        return err;
-    }else{
-        /*
-		* Fatal request error
-        */
-    }
-    
-    
+		return MANGO_ERR;
+	}
+
     return MANGO_ERR;
 }
 
 
-
-int main(){
+int websockets_test(void)
+{
     mangoHttpClient_t* httpClient;
     mangoErr_t err;
     
@@ -206,24 +253,15 @@ int main(){
     /*
     * Do the HTTP GET 
     */
-    err = httpGet(httpClient);
-    if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){ 
-        /*
-        * HTTP request recognized by the server, err stores the 
-        * final HTTP response status code. It may be a 200 or
-        * any other status code. 
-        *
-        * NOTE: At this point the status of the HTTP session is healthy
-        * and we can continue sending other HTTP request without
-        * closing the HTTP connection. It is possible to call httpGet()
-        * again or to continue with new POST/PUT/GET/HEAD requests.
-        */
+    err = testWebsocket(httpClient);
+    if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){
+
         PRINTF("HTTP response code was %d\r\n", err);
     }
     else {
         /*
-        * Fatal error during the GET request (working buffer was small or connection was closed). 
-        * At this point mango_disconnect() should be called. 
+        * Fatal error during the GET request (working buffer was small / connection was closed). 
+        * At this point mango_disconnect() should be called.
         */
         PRINTF("HTTP request failed!\r\n");
     }

@@ -25,42 +25,21 @@
 
 #define PRINTF              printf
 
+
+
+
 /*
-* Define this if you want to test chunked-encoded resource
+* This example demonstrates Basic Access Authentication HTTP requests
+* 
+* The target URL is the local Access Point..
 */
-//#define CHUNKED_GET
+#define SERVER_IP           "192.168.2.4"
+#define SERVER_HOSTNAME     "192.168.2.4"
+#define SERVER_PORT         80
+#define RESOURCE_URL        "/" 
 
-
-#ifdef CHUNKED_GET
-    /*
-    * This example demonstrates HTTP GET requests where the HTTP body 
-    * is encoded with chunkes. When mango detects the chuned encoding
-    * it will strip the chunk metadata providing to the application
-    * only the actual data. This is done automatically so chunked GET
-    * does not require any special configuration compared to normal GET.
-    * 
-    * The target URL is an image hosted in http://www.httpwatch.com
-    * (http://www.httpwatch.com/httpgallery/chunked/)
-    */
-    #define SERVER_IP           "191.236.16.125"
-    #define SERVER_HOSTNAME     "www.httpwatch.com"
-    #define SERVER_PORT         80
-    #define RESOURCE_URL        "/httpgallery/chunked/chunkedimage.aspx?0.020209475534940458" 
-#else
-    /*
-    * This example demonstrates non-chunked HTTP GET requests.
-    * 
-    * The target URL is the home page of stackoverflow (http://stackoverflow.com/)
-    */
-    #define SERVER_IP           "198.252.206.140"
-    #define SERVER_HOSTNAME     "stackoverflow.com"
-    #define SERVER_PORT         80
-    #define RESOURCE_URL        "/" 
-#endif
-
-
-
-mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs){
+static mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs)
+{
 	mangoErr_t err;
     
 	switch(mangoArgs->argType){
@@ -113,11 +92,7 @@ mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs){
 			PRINTF("-----------------------------------------------------------------\r\n");
 			PRINTF("HTTP DATA RECEIVED: [%u bytes]\r\n", mangoArgs->buflen);
 			PRINTF("-----------------------------------------------------------------\r\n");
-#ifdef CHUNKED_GET
-            /* Don't print binary data */
-#else
 			PRINTF("%s\r\n", mangoArgs->buf);
-#endif
 			PRINTF("-----------------------------------------------------------------\r\n");
 			
             break;
@@ -165,7 +140,8 @@ mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs){
 };
 
 
-mangoErr_t httpGet(mangoHttpClient_t* httpClient){
+static mangoErr_t httpGet(mangoHttpClient_t* httpClient)
+{
     mangoErr_t err;
 
     /*
@@ -178,7 +154,7 @@ mangoErr_t httpGet(mangoHttpClient_t* httpClient){
 	/*
 	* If Basic Access Authentication is needed enable this..
 	*/
-	//err = mango_httpAuthSet(httpClient, MANGO_HTTP_AUTH__BASIC, "admin", "admin");
+	err = mango_httpAuthSet(httpClient, MANGO_HTTP_AUTH__BASIC, "Cisco", "Cisco");
 	if(err != MANGO_OK){ return MANGO_ERR; }
 	
     /*
@@ -216,7 +192,8 @@ mangoErr_t httpGet(mangoHttpClient_t* httpClient){
 
 
 
-int main(){
+int basicAuth_test(void)
+{
     mangoHttpClient_t* httpClient;
     mangoErr_t err;
     
