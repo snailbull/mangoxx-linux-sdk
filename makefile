@@ -41,7 +41,7 @@ OIMAGES := $(GEN_IMAGES:%=$(IMAGEODIR)/%)
 BINODIR := $(ODIR)/$(FLAVOR)/bin
 OBINS := $(GEN_BINS:%=$(BINODIR)/%)
 
-GEN_BUILDS := $(foreach f,$(SUBDIRS),$(f)/$(ODIR)/$(FLAVOR)/built-in.o)
+GEN_BUILTS := $(foreach f,$(SUBDIRS),$(f)/$(ODIR)/$(FLAVOR)/built-in.o)
 
 CCFLAGS += 	\
 	-g				\
@@ -51,7 +51,6 @@ CCFLAGS += 	\
 #	-Wall
 
 CFLAGS = $(CCFLAGS) $(DEFINES) $(EXTRA_CCFLAGS) $(INCLUDES)
-DFLAGS = $(CCFLAGS) $(DDEFINES) $(EXTRA_CCFLAGS) $(INCLUDES)
 
 
 #############################################################
@@ -72,7 +71,7 @@ $$(LIBODIR)/$(1).a: $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1)) $$(DEPENDS_$(1)
 	@echo AR $(1).a
 	@$$(AR) ru $$@ $$(filter %.o,$$?) $$(if $$(filter %.a,$$?),$$(EXTRACT_DIR)_$(1)/*.o)
 	@echo LD built-in.o
-	$$(LD) -r -o $$(LIBODIR)/../built-in.o $$(filter %.o,$$?) $$(foreach f,$$(SUBDIRS),$$(f)/$$(ODIR)/$$(FLAVOR)/built-in.o)
+	@$$(LD) -r -o $$(LIBODIR)/../built-in.o $$(filter %.o,$$?) $$(foreach f,$$(SUBDIRS),$$(f)/$$(ODIR)/$$(FLAVOR)/built-in.o)
 	@$$(if $$(filter %.a,$$?),$$(RM) -r $$(EXTRACT_DIR)_$(1))
 endef
 
@@ -82,22 +81,30 @@ DEP_OBJS_$(1) = $$(foreach obj,$$(filter %.o,$$(COMPONENTS_$(1))),$$(dir $$(obj)
 $$(IMAGEODIR)/$(1).out: $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1)) $$(DEPENDS_$(1))
 	@mkdir -p $$(IMAGEODIR)
 	@echo LD $$@
-	$$(CC) $$(LDFLAGS) $$(if $$(LINKFLAGS_$(1)),$$(LINKFLAGS_$(1)),$$(LINKFLAGS_DEFAULT) $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1))) -o $$@ $$(GEN_BUILDS)
+	@$$(CC) $$(LDFLAGS) $$(if $$(LINKFLAGS_$(1)),$$(LINKFLAGS_$(1)),$$(LINKFLAGS_DEFAULT) $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1))) -o $$@ $$(GEN_BUILTS)
+endef
+
+define MakeTarget
+DEP_LIBS_$(1) = $$(foreach lib,$$(filter %.a,$$(COMPONENTS_$(1))),$$(dir $$(lib))$$(LIBODIR)/$$(notdir $$(lib)))
+DEP_OBJS_$(1) = $$(foreach obj,$$(filter %.o,$$(COMPONENTS_$(1))),$$(dir $$(obj))$$(OBJODIR)/$$(notdir $$(obj)))
+$(1).elf: $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1)) $$(DEPENDS_$(1))
+	@echo CC $$@
+	@$$(CC) $$(LDFLAGS) $$(if $$(LINKFLAGS_$(1)),$$(LINKFLAGS_$(1)),$$(LINKFLAGS_DEFAULT) $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1))) -o $$@ $$(GEN_BUILTS)
 endef
 
 #############################################################
 # Rules base
 # Should be done in top-level makefile only
 #
-
-all:	.subdirs $(OBJS) $(OLIBS) $(OIMAGES) $(OBINS) $(OBUILD) $(SPECIAL_MKTARGETS)
+.PHONY: all clean distclean
+all:	.subdirs $(OBJS) $(OLIBS) $(OIMAGES) $(OBINS) $(GEN_TARGETS)
 
 clean:
 	@$(foreach d, $(SUBDIRS), $(MAKE) -C $(d) clean;)
 	$(RM) -r $(ODIR)/$(FLAVOR)
 
-clobber: $(SPECIAL_CLOBBER)
-	@$(foreach d, $(SUBDIRS), $(MAKE) -C $(d) clobber;)
+distclean:
+	@$(foreach d, $(SUBDIRS), $(MAKE) -C $(d) distclean;)
 	$(RM) -r $(ODIR)
 
 .subdirs:
@@ -112,7 +119,7 @@ debug:
 	@echo "OLIBS:" $(OLIBS)
 	@echo "OIMAGES:" $(OIMAGES)
 	@echo "OBINS:" $(OBINS)
-	@echo "SPECIAL_MKTARGETS:" $(SPECIAL_MKTARGETS)
+	@echo "GEN_TARGETS:" $(GEN_TARGETS)
 	@echo "GEN_LIBS:" $(GEN_LIBS)
 	@echo "GEN_BINS:" $(GEN_BINS)
 	@echo "GEN_IMAGES:" $(GEN_IMAGES)
@@ -123,11 +130,11 @@ debug:
 	@echo "LIBODIR:" $(LIBODIR)
 	@echo "IMAGEODIR:" $(IMAGEODIR)
 	@echo "BINODIR:" $(BINODIR)
-	@echo "GEN_BUILDS:" $(GEN_BUILDS)
+	@echo "GEN_BUILTS:" $(GEN_BUILTS)
 
 
 ifneq ($(MAKECMDGOALS),clean)
-ifneq ($(MAKECMDGOALS),clobber)
+ifneq ($(MAKECMDGOALS),distclean)
 ifdef DEPS
 sinclude $(DEPS)
 endif
@@ -137,7 +144,7 @@ endif
 $(OBJODIR)/%.o: %.c
 	@echo CC $<
 	@mkdir -p $(OBJODIR);
-	@$(CC) $(if $(findstring $<,$(DSRCS)),$(DFLAGS),$(CFLAGS)) $(COPTS_$(*F)) -o $@ -c $<
+	@$(CC) $(CFLAGS) $(COPTS_$(*F)) -o $@ -c $<
 
 $(OBJODIR)/%.d: %.c
 	@mkdir -p $(OBJODIR);
@@ -149,7 +156,7 @@ $(OBJODIR)/%.d: %.c
 $(OBJODIR)/%.o: %.cpp
 	@echo CPP $<
 	@mkdir -p $(OBJODIR);
-	@$(CPP) $(if $(findstring $<,$(DSRCS)),$(DFLAGS),$(CFLAGS)) $(COPTS_$(*F)) -o $@ -c $<
+	@$(CPP) $(CFLAGS) $(COPTS_$(*F)) -o $@ -c $<
 
 $(OBJODIR)/%.d: %.cpp
 	@mkdir -p $(OBJODIR);
@@ -159,8 +166,8 @@ $(OBJODIR)/%.d: %.cpp
 	rm -f $@.$$$$
 
 $(OBJODIR)/%.o: %.s
-	@echo CC $<
 	@mkdir -p $(OBJODIR);
+	@echo AS $<
 	@$(CC) $(CFLAGS) -o $@ -c $<
 
 $(OBJODIR)/%.d: %.s
@@ -172,7 +179,8 @@ $(OBJODIR)/%.d: %.s
 
 $(OBJODIR)/%.o: %.S
 	@mkdir -p $(OBJODIR);
-	$(CC) $(CFLAGS) -D__ASSEMBLER__ -o $@ -c $<
+	@echo AS $<
+	@$(CC) $(CFLAGS) -D__ASSEMBLER__ -o $@ -c $<
 
 $(OBJODIR)/%.d: %.S
 	@mkdir -p $(OBJODIR); \
@@ -189,6 +197,8 @@ $(foreach lib,$(GEN_LIBS),$(eval $(call MakeLibrary,$(basename $(lib)))))
 
 $(foreach image,$(GEN_IMAGES),$(eval $(call MakeImage,$(basename $(image)))))
 
+$(foreach target,$(GEN_TARGETS),$(eval $(call MakeTarget,$(basename $(target)))))
+
 #############################################################
 # Recursion Magic - Don't touch this!!
 #
@@ -201,6 +211,5 @@ $(foreach image,$(GEN_IMAGES),$(eval $(call MakeImage,$(basename $(image)))))
 # Required for each makefile to inherit from the parent
 #
 INCLUDES := $(INCLUDES) -I $(PDIR)include
-INCLUDES += -I $(PDIR)third_party
 INCLUDES += -I $(PDIR)third_party
 INCLUDES += -I /home/robin/miniconda2/include

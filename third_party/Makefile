@@ -17,12 +17,8 @@ FLAVOR = debug
 ifndef PDIR # {
 #GEN_IMAGES= app.out
 #GEN_BINS= app.bin
-GEN_TARGETS= app.elf
-SUBDIRS=    \
-	mango_test	\
-	fcmd	\
-	mango	\
-	user
+#GEN_TARGETS= app.elf
+SUBDIRS ?= $(patsubst %/,%,$(dir $(wildcard */Makefile)))
 
 endif # } PDIR
 
@@ -31,9 +27,6 @@ CCFLAGS += -Ofast
 TARGET_LDFLAGS =
 
 COMPONENTS_app = \
-	mango_test/libmango_test.a	\
-	fcmd/libfcmd.a		\
-	mango/libmango.a	\
 	user/libuser.a
 
 LINKFLAGS_app := \

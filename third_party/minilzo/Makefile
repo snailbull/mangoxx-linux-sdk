@@ -1,3 +1,4 @@
+
 #############################################################
 # Required variables for each makefile
 # Discard this section from all parent makefiles
@@ -5,44 +6,14 @@
 #   CSRCS (all "C" files in the dir)
 #   SUBDIRS (all subdirs with a Makefile)
 #   GEN_LIBS - list of libs to be generated ()
-#   GEN_IMAGES - list of object file images to be generated ()
-#   GEN_BINS - list of binaries to be generated ()
+#   GEN_IMAGES - list of images to be generated ()
 #   COMPONENTS_xxx - a list of libs/objs in the form
 #     subdir/lib to be extracted and rolled up into
 #     a generated lib/image xxx.a ()
 #
-#FLAVOR = release
-FLAVOR = debug
-
-ifndef PDIR # {
-#GEN_IMAGES= app.out
-#GEN_BINS= app.bin
-GEN_TARGETS= app.elf
-SUBDIRS=    \
-	mango_test	\
-	fcmd	\
-	mango	\
-	user
-
-endif # } PDIR
-
-CCFLAGS += -Ofast
-
-TARGET_LDFLAGS =
-
-COMPONENTS_app = \
-	mango_test/libmango_test.a	\
-	fcmd/libfcmd.a		\
-	mango/libmango.a	\
-	user/libuser.a
-
-LINKFLAGS_app := \
-	-L$(PDIR)lib	\
-	-lssl			\
-	-lcrypto		\
-	-lpthread
-
-#DEPENDS_app := $(LD_FILE)
+ifndef PDIR
+GEN_LIBS = libminilzo.a
+endif
 
 #############################################################
 # Configuration i.e. compile options etc.
@@ -51,19 +22,9 @@ LINKFLAGS_app := \
 #   makefile at its root level - these are then overridden
 #   for a subtree within the makefile rooted therein
 #
+#DEFINES += -D_POSIX_SOURCE
 
-#UNIVERSAL_TARGET_DEFINES =		\
-
-# Other potential configuration flags include:
-#	-DTXRX_TXBUF_DEBUG
-#	-DTXRX_RXBUF_DEBUG
-#	-DWLAN_CONFIG_CCX
-#CONFIGURATION_DEFINES =	-DICACHE_FLASH
-
-DEFINES +=				\
-	$(UNIVERSAL_TARGET_DEFINES)	\
-	$(CONFIGURATION_DEFINES)
-
+CCFLAGS += -fomit-frame-pointer
 
 #############################################################
 # Recursion Magic - Don't touch this!!
@@ -76,7 +37,8 @@ DEFINES +=				\
 #
 # Required for each makefile to inherit from the parent
 #
-INCLUDES := $(INCLUDES) -I $(PDIR)include
+INCLUDES := $(INCLUDES) -I $(PDIR)include -I ./
+
 
 
 ifndef PDIR
