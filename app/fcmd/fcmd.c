@@ -20,10 +20,10 @@
 	0.03增加对可变参数的支持,eg:int printf(const char *fmt, ...)
 *******************************************************************************/
 #include "fcmd.h"
-
+#include "cmd_mem.h"
 
 #define PARAMS_NUM  10 //函数支持10个参数
-#define SYSTEM_CMD  3  //系统命令的个数, CmdTbl增加系统命令的同时也要增加这个变量
+#define SYSTEM_CMD  2  //系统命令的个数, CmdTbl增加系统命令的同时也要增加这个变量
 
 #define _args_t  int	//参数类型，对于16bit和8bit单片机要注意
 
@@ -57,25 +57,16 @@ static void system_cmd_exe(uint8_t n)
 
 	switch (n)
 	{
-	case 0://ls:列出所有的命令
+	case 0:
 		PRINTF("------------- function list --------------\n");
-		for (i = 0; i < CmdTblSize; i++)
-		{
-			PRINTF("%s\n", CmdTbl[i].fname);
-		}
-		PRINTF("-------------------------------------------\n");
-		break;
-
-	case 1://addr:列出所有函数指针的地址
-		PRINTF("------------------------------------------\n");
 		for (i = 0; i < CmdTblSize; i++)
 		{
 			PRINTF("0x%08x: %s\n", (int)CmdTbl[i].pfunc, CmdTbl[i].fname);
 		}
-		PRINTF("------------------------------------------\n");
+		PRINTF("-------------------------------------------\n");
 		break;
 
-	case 2:
+	case 1:
 		PRINTF(
 		    "---------------------------------------------\n"
 		    "fcmd V0.03  zrpeng\n"
@@ -439,7 +430,9 @@ void fcmd_exec(uint8_t *cmd)
 	_args_t ret = 0;					//函数返回值
 	uint8_t i;
 	int8_t cmdtbl_param_num;
-
+	
+	if (*cmd == '\0')
+		return ;
 	//跳过开头空格
 	while (*pcmd == ' ')
 	{
@@ -598,5 +591,3 @@ void fcmd_exec(uint8_t *cmd)
 		PRINTF("=0x%08x,%d;\n", ret, ret);
 	}
 }
-
-

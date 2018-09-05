@@ -18,15 +18,10 @@ ifndef PDIR # {
 #GEN_IMAGES= app.out
 #GEN_BINS= app.bin
 GEN_TARGETS= app.elf
-SUBDIRS=    \
-	mango_test	\
-	fcmd	\
-	mango	\
-	user
-
+SUBDIRS ?= $(patsubst %/,%,$(dir $(wildcard */Makefile)))
 endif # } PDIR
 
-CCFLAGS += -Ofast
+CCFLAGS += -Ofast -Wno-pointer-to-int-cast
 
 TARGET_LDFLAGS =
 
@@ -40,6 +35,7 @@ LINKFLAGS_app := \
 	-L$(PDIR)lib	\
 	-lssl			\
 	-lcrypto		\
+	-lreadline		\
 	-lpthread
 
 #DEPENDS_app := $(LD_FILE)
@@ -76,8 +72,10 @@ DEFINES +=				\
 #
 # Required for each makefile to inherit from the parent
 #
-INCLUDES := $(INCLUDES) -I $(PDIR)include
-
+INCLUDES += -I $(PDIR)include
+INCLUDES += -I $(PDIR)app/fcmd
+INCLUDES += -I $(PDIR)app/mango
+INCLUDES += -I $(PDIR)app/user
 
 ifndef PDIR
 PDIR := $(CURDIR)/../

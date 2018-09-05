@@ -157,5 +157,3 @@ int cmp(void *mem1, void *mem2, int elem_cnt, int elem_size)
 
 	return rcode;
 }
-
-

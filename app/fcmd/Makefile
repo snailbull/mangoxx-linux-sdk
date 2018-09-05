@@ -37,7 +37,7 @@ CCFLAGS += -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
 #
 # Required for each makefile to inherit from the parent
 #
-INCLUDES := $(INCLUDES) -I $(PDIR)include -I ./
+INCLUDES += -I $(PDIR)include
 
 
 

@@ -14,9 +14,8 @@
 CmdTbl_t CmdTbl[] =
 {
 	//系统命令, SYSTEM_CMD_NUM和系统命令个数保持一致
-	"ls",  0,
-	"addr", 0,
-	"help", 0,
+	"l",  0,
+	"h", 0,
 
 
 	//用户命令

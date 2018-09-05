@@ -71,7 +71,7 @@ $$(LIBODIR)/$(1).a: $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1)) $$(DEPENDS_$(1)
 	@echo AR $(1).a
 	@$$(AR) ru $$@ $$(filter %.o,$$?) $$(if $$(filter %.a,$$?),$$(EXTRACT_DIR)_$(1)/*.o)
 	@echo LD built-in.o
-	@$$(LD) -r -o $$(LIBODIR)/../built-in.o $$(filter %.o,$$?) $$(foreach f,$$(SUBDIRS),$$(f)/$$(ODIR)/$$(FLAVOR)/built-in.o)
+	@$$(LD) -r -o $$(LIBODIR)/../built-in.o $$(OBJS) $$(foreach f,$$(SUBDIRS),$$(f)/$$(ODIR)/$$(FLAVOR)/built-in.o)
 	@$$(if $$(filter %.a,$$?),$$(RM) -r $$(EXTRACT_DIR)_$(1))
 endef
 
@@ -210,6 +210,6 @@ $(foreach target,$(GEN_TARGETS),$(eval $(call MakeTarget,$(basename $(target))))
 #
 # Required for each makefile to inherit from the parent
 #
-INCLUDES := $(INCLUDES) -I $(PDIR)include
+INCLUDES += -I $(PDIR)include
 INCLUDES += -I $(PDIR)third_party
 INCLUDES += -I /home/robin/miniconda2/include
