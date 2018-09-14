@@ -47,7 +47,6 @@ CCFLAGS += 	\
 	-g				\
 	-Wpointer-arith	\
 	-Wundef			\
-	-Werror			\
 #	-Wall
 
 CFLAGS = $(CCFLAGS) $(DEFINES) $(EXTRA_CCFLAGS) $(INCLUDES)
@@ -71,7 +70,7 @@ $$(LIBODIR)/$(1).a: $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1)) $$(DEPENDS_$(1)
 	@echo AR $(1).a
 	@$$(AR) ru $$@ $$(filter %.o,$$?) $$(if $$(filter %.a,$$?),$$(EXTRACT_DIR)_$(1)/*.o)
 	@echo LD built-in.o
-	@$$(LD) -r -o $$(LIBODIR)/../built-in.o $$(OBJS) $$(foreach f,$$(SUBDIRS),$$(f)/$$(ODIR)/$$(FLAVOR)/built-in.o)
+	$$(LD) -r -o $$(LIBODIR)/../built-in.o $$(OBJS) $$(foreach f,$$(SUBDIRS),$$(f)/$$(ODIR)/$$(FLAVOR)/built-in.o)
 	@$$(if $$(filter %.a,$$?),$$(RM) -r $$(EXTRACT_DIR)_$(1))
 endef
 
@@ -89,7 +88,7 @@ DEP_LIBS_$(1) = $$(foreach lib,$$(filter %.a,$$(COMPONENTS_$(1))),$$(dir $$(lib)
 DEP_OBJS_$(1) = $$(foreach obj,$$(filter %.o,$$(COMPONENTS_$(1))),$$(dir $$(obj))$$(OBJODIR)/$$(notdir $$(obj)))
 $(1).elf: $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1)) $$(DEPENDS_$(1))
 	@echo CC $$@
-	@$$(CC) $$(LDFLAGS) $$(if $$(LINKFLAGS_$(1)),$$(LINKFLAGS_$(1)),$$(LINKFLAGS_DEFAULT) $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1))) -o $$@ $$(GEN_BUILTS)
+	$$(CC) $$(LDFLAGS) $$(if $$(LINKFLAGS_$(1)),$$(LINKFLAGS_$(1)),$$(LINKFLAGS_DEFAULT) $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1))) $$(GEN_BUILTS) -o $$@
 endef
 
 #############################################################
@@ -100,15 +99,15 @@ endef
 all:	.subdirs $(OBJS) $(OLIBS) $(OIMAGES) $(OBINS) $(GEN_TARGETS)
 
 clean:
-	@$(foreach d, $(SUBDIRS), $(MAKE) -C $(d) clean;)
+	@$(foreach d, $(SUBDIRS), $(MAKE) --silent -C $(d) clean;)
 	$(RM) -r $(ODIR)/$(FLAVOR)
 
 distclean:
-	@$(foreach d, $(SUBDIRS), $(MAKE) -C $(d) distclean;)
+	@$(foreach d, $(SUBDIRS), $(MAKE) --silent -C $(d) distclean;)
 	$(RM) -r $(ODIR)
 
 .subdirs:
-	@set -e; $(foreach d, $(SUBDIRS), $(MAKE) -C $(d);)
+	@set -e; $(foreach d, $(SUBDIRS), $(MAKE) --silent -C $(d);)
 
 debug:
 	@echo "INCLUDES:" $(INCLUDES)
@@ -212,4 +211,5 @@ $(foreach target,$(GEN_TARGETS),$(eval $(call MakeTarget,$(basename $(target))))
 #
 INCLUDES += -I $(PDIR)include
 INCLUDES += -I $(PDIR)third_party
-INCLUDES += -I /home/robin/miniconda2/include
+INCLUDES += -I /usr/include
+INCLUDES += -I /usr/local/include

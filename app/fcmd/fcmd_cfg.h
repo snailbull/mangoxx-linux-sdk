@@ -7,6 +7,7 @@
 #include "cmd_mem.h"
 
 
+int get_test(char *server, int port, char *url);
 
 /*******************************************************************************
  * 自定义函数命令表
@@ -32,6 +33,8 @@ CmdTbl_t CmdTbl[] =
 	"size_t fwrite(const void *p,size_t size,size_t nmemb, FILE *fp)", (void(*)(void))fwrite,
 	"size_t fread(void *p, size_t size, size_t nmenb, FILE *fp)", (void(*)(void))fread,
 	"int strncmp(char *s1,char *s2,int n)",	(void(*)(void))strncmp,
+
+	"int get_test(char *server, uint16_t port, char *url)", (void(*)(void))get_test,
 
 
 };

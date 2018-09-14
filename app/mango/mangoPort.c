@@ -246,6 +246,7 @@ int mangoPort_connect(char* serverIP, uint16_t serverPort, uint32_t timeout){
     int retval;
     struct sockaddr_in s_addr_in;
     int socketfd;
+    uint8_t *pch;
     
     socketfd = socket(AF_INET, SOCK_STREAM, 0);
     
@@ -258,12 +259,11 @@ int mangoPort_connect(char* serverIP, uint16_t serverPort, uint32_t timeout){
 
     if(retval == 0){
         retval = fcntl(socketfd, F_SETFL, O_NONBLOCK);
-        if(retval == 0){
-            
+        if(retval == 0){   
         }
-        
         return socketfd;
     }else{
+        printf("connect:%s,%d", strerror(errno), errno);
         close(socketfd);
         return -1;
     }

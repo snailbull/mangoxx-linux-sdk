@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 		
         // Do stuff...
 		fcmd_exec(input);
-  
+        
         // Free input.
         free(input);
 		input = NULL;

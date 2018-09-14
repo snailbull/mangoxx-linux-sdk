@@ -58,6 +58,9 @@
     #define RESOURCE_URL        "/" 
 #endif
 
+char s_server_ip[64];
+uint16_t s_server_port;
+char s_url[64];
 
 
 static mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs)
@@ -173,7 +176,7 @@ static mangoErr_t httpGet(mangoHttpClient_t* httpClient)
     /*
     * Select if a GET or HEAD request will be sent
     */
-    err = mango_httpRequestNew(httpClient, RESOURCE_URL,  MANGO_HTTP_METHOD_GET);
+    err = mango_httpRequestNew(httpClient, s_url,  MANGO_HTTP_METHOD_GET);
     //err = mango_httpRequestNew(httpClient, RESOURCE_URL,  MANGO_HTTP_METHOD_HEAD);
     if(err != MANGO_OK){ return MANGO_ERR; }
     
@@ -187,7 +190,7 @@ static mangoErr_t httpGet(mangoHttpClient_t* httpClient)
     * The "host: xxxx" header is required by almost all servers so we need
     * to add it.
     */
-    err = mango_httpHeaderSet(httpClient, MANGO_HDR__HOST, SERVER_HOSTNAME);
+    err = mango_httpHeaderSet(httpClient, MANGO_HDR__HOST, s_server_ip);
     if(err != MANGO_OK){ return MANGO_ERR; }
     
     /*
@@ -212,21 +215,22 @@ static mangoErr_t httpGet(mangoHttpClient_t* httpClient)
         */
     }
     
-    
     return MANGO_ERR;
 }
 
-
-
-int get_test(void)
+int get_test(char *server, uint16_t port, char *url)
 {
     mangoHttpClient_t* httpClient;
     mangoErr_t err;
     
+    strcpy(s_server_ip, server);
+    s_server_port = port;
+    strcpy(s_url, url);
+
     /*
     * Connect to server
     */
-    httpClient = mango_connect(SERVER_IP, SERVER_PORT);
+    httpClient = mango_connect(s_server_ip, s_server_port);
     if(!httpClient){
         PRINTF("mangoHttpClient_connect() FAILED!");
         return MANGO_ERR;
@@ -252,7 +256,7 @@ int get_test(void)
     else {
         /*
         * Fatal error during the GET request (working buffer was small or connection was closed). 
-        * At this point mango_disconnect() should be called. 
+        * At this point mango_disconnect() should be called.
         */
         PRINTF("HTTP request failed!\r\n");
     }

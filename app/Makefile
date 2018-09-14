@@ -33,9 +33,11 @@ COMPONENTS_app = \
 
 LINKFLAGS_app := \
 	-L$(PDIR)lib	\
+	-Wl,-E			\
 	-lssl			\
 	-lcrypto		\
 	-lreadline		\
+	-lncursesw		\
 	-lpthread
 
 #DEPENDS_app := $(LD_FILE)
