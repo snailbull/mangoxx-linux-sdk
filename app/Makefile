@@ -75,7 +75,6 @@ DEFINES +=				\
 # Required for each makefile to inherit from the parent
 #
 INCLUDES += -I $(PDIR)include
-INCLUDES += -I $(PDIR)app/fcmd
 INCLUDES += -I $(PDIR)app/mango
 INCLUDES += -I $(PDIR)app/user
 

@@ -99,15 +99,15 @@ endef
 all:	.subdirs $(OBJS) $(OLIBS) $(OIMAGES) $(OBINS) $(GEN_TARGETS)
 
 clean:
-	@$(foreach d, $(SUBDIRS), $(MAKE) --silent -C $(d) clean;)
+	@$(foreach d, $(SUBDIRS), $(MAKE) -C $(d) clean;)
 	$(RM) -r $(ODIR)/$(FLAVOR)
 
 distclean:
-	@$(foreach d, $(SUBDIRS), $(MAKE) --silent -C $(d) distclean;)
+	@$(foreach d, $(SUBDIRS), $(MAKE) -C $(d) distclean;)
 	$(RM) -r $(ODIR)
 
 .subdirs:
-	@set -e; $(foreach d, $(SUBDIRS), $(MAKE) --silent -C $(d);)
+	@set -e; $(foreach d, $(SUBDIRS), $(MAKE) -C $(d);)
 
 debug:
 	@echo "INCLUDES:" $(INCLUDES)

@@ -6,7 +6,7 @@
 #include <readline/history.h>
 #include <semaphore.h>
 
-#include "fcmd.h"
+#include "../fcmd/fcmd.h"
 
 int main(int argc, char *argv[])
 {
