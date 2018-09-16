@@ -8,6 +8,7 @@
 
 
 int get_test(char *server, int port, char *url);
+int sslget_test(char *server, uint16_t port, char *url);
 
 /*******************************************************************************
  * 自定义函数命令表
@@ -35,7 +36,7 @@ CmdTbl_t CmdTbl[] =
 	"int strncmp(char *s1,char *s2,int n)",	(void(*)(void))strncmp,
 
 	"int get_test(char *server, uint16_t port, char *url)", (void(*)(void))get_test,
-
+	"int sslget_test(char *server, uint16_t port, char *url)", (void(*)(void))sslget_test,
 
 };
 uint8_t CmdTblSize = sizeof(CmdTbl) / sizeof(CmdTbl[0]);

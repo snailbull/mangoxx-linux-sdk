@@ -102,12 +102,16 @@ mangoHttpClient_t *mango_sslconnect(char* serverIP, uint16_t serverPort, ssl_ca_
     return hc;
 
 failed3:
+	MANGO_DBG(MANGO_DBG_LEVEL_PORT,("failed3:SSL_free(hc->ssl)\n"));
 	SSL_free(hc->ssl);
 failed2:
+	MANGO_DBG(MANGO_DBG_LEVEL_PORT,("failed2:close(hc->socketfd)\n"));
 	close(hc->socketfd);
 failed1:
+	MANGO_DBG(MANGO_DBG_LEVEL_PORT,("failed1:SSL_CTX_free(hc->ctx)\n"));
 	SSL_CTX_free(hc->ctx);
 failed:
+	MANGO_DBG(MANGO_DBG_LEVEL_PORT,("failed:mangoPort_free(hc)\n"));
 	mangoPort_free(hc);
 	return NULL;
 }

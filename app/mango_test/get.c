@@ -268,3 +268,70 @@ int get_test(char *server, uint16_t port, char *url)
     
     return 0;
 }
+
+int sslget_test(char *server, uint16_t port, char *url)
+{
+    mangoHttpClient_t* httpClient;
+    mangoErr_t err;
+    
+    strcpy(s_server_ip, server);
+    s_server_port = port;
+    strcpy(s_url, url);
+
+    OpenSSL_add_ssl_algorithms();
+    SSL_load_error_strings();
+
+	ssl_ca_crt_key_t *cck;
+	cck = sslcert_load("./mango_test/cert/ca.crt", NULL, NULL);
+	if (cck == NULL)
+	{
+		printf("sslfile_load error!\n");
+		return MANGO_ERR;
+	}
+	/*
+	Fragment size range 2048~8192
+	| Private key len | Fragment size recommend |
+	| RSA2048         | 2048                    |
+	| RSA3072         | 3072                    |
+	| RSA4096         | 4096                    |
+	*/
+	httpClient = mango_sslconnect(s_server_ip, s_server_port, cck, TLSv1_2_client_method(), SSL_VERIFY_NONE, 2048);
+	sslcert_free(cck);
+	if (!httpClient)
+	{
+		printf("mangoHttpClient_connect() FAILED!");
+		return MANGO_ERR;
+	}
+    
+    /*
+    * Do the HTTP GET 
+    */
+    err = httpGet(httpClient);
+    if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){ 
+        /*
+        * HTTP request recognized by the server, err stores the 
+        * final HTTP response status code. It may be a 200 or
+        * any other status code. 
+        *
+        * NOTE: At this point the status of the HTTP session is healthy
+        * and we can continue sending other HTTP request without
+        * closing the HTTP connection. It is possible to call httpGet()
+        * again or to continue with new POST/PUT/GET/HEAD requests.
+        */
+        PRINTF("HTTP response code was %d\r\n", err);
+    }
+    else {
+        /*
+        * Fatal error during the GET request (working buffer was small or connection was closed). 
+        * At this point mango_disconnect() should be called.
+        */
+        PRINTF("HTTP request failed!\r\n");
+    }
+    
+    /*
+    * Disconnect from server
+    */
+    mango_ssldisconnect(httpClient);
+    
+    return 0;
+}
