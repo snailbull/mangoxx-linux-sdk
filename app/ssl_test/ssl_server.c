@@ -6,21 +6,16 @@
 #include <openssl/err.h>
 #include <sys/socket.h>
 #include <netinet/in.h>  
-#include "dlfcn.h"
- 
-#define CERTSERVER "serverCert.cer"
-#define KEYSERVER "serverKey.pem"
- 
+
 #define CHK_ERR(err, s) if((err) == -1) { perror(s); return -1; }
 #define CHK_RV(rv, s) if((rv) != 1) { printf("%s error\n", s); return -1; }
 #define CHK_NULL(x, s) if((x) == NULL) { printf("%s error\n", s); return -1; }
 #define CHK_SSL(err, s) if((err) == -1) { ERR_print_errors_fp(stderr);  return -1;}
  
-int main()
+int main(int argc, char *argv[])
 {
 	int rv, err;
 	SSL_CTX *ctx = NULL;
-	SSL_METHOD *meth = NULL;
 	int listen_sd;
 	int accept_sd;
 	struct sockaddr_in socketAddrServer;
@@ -32,14 +27,13 @@ int main()
 	rv = SSL_library_init();
 	CHK_RV(rv, "SSL_library_init");
  
-	meth = SSLv23_server_method();
-	ctx = SSL_CTX_new(meth);
+	ctx = SSL_CTX_new(SSLv23_server_method());
 	CHK_NULL(ctx, "SSL_CTX_new");
  
-	rv = SSL_CTX_use_certificate_file(ctx, CERTSERVER, SSL_FILETYPE_PEM);
+	rv = SSL_CTX_use_certificate_file(ctx, "server.crt", SSL_FILETYPE_PEM);
 	CHK_RV(rv, "SSL_CTX_use_certicificate_file");
  
-	rv = SSL_CTX_use_PrivateKey_file(ctx, KEYSERVER, SSL_FILETYPE_PEM);
+	rv = SSL_CTX_use_PrivateKey_file(ctx, "server.key", SSL_FILETYPE_PEM);
 	CHK_RV(rv, "SSL_CTX_use_PrivateKey_file");
 	
 	rv = SSL_CTX_check_private_key(ctx);

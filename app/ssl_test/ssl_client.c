@@ -6,20 +6,18 @@
 #include <openssl/err.h>
 #include <sys/socket.h>
 #include <netinet/in.h>  
-#include "dlfcn.h"
- 
+
 #define CHK_ERR(err, s) if((err) == -1) { perror(s); return -1; }
 #define CHK_RV(rv, s) if((rv) != 1) { printf("%s error\n", s); return -1; }
 #define CHK_NULL(x, s) if((x) == NULL) { printf("%s error\n", s); return -1; }
 #define CHK_SSL(err, s) if((err) == -1) { ERR_print_errors_fp(stderr);  return -1;}
  
-int main()
+int main(int argc, char *argv[])
 {
 	int rv;
 	int err;
 	int listen_sd;
 	struct sockaddr_in socketAddrClient;
-	SSL_METHOD *meth = NULL;
 	SSL_CTX *ctx = NULL;
 	SSL *ssl = NULL;
 	char buf[4096];
@@ -27,16 +25,15 @@ int main()
 	rv = SSL_library_init();
 	CHK_RV(rv, "SSL_library_init");
  
-	meth = SSLv23_client_method();
-	ctx = SSL_CTX_new(meth);
+	ctx = SSL_CTX_new(SSLv23_client_method());
 	CHK_NULL(ctx, "SSL_CTX_new");
  
 	listen_sd = socket(AF_INET, SOCK_STREAM, 0);
 	CHK_ERR(listen_sd, "socket");
 	memset(&socketAddrClient, 0, sizeof(socketAddrClient));
 	socketAddrClient.sin_family = AF_INET;
-	socketAddrClient.sin_port = htons(8443);
-	socketAddrClient.sin_addr.s_addr = inet_addr("127.0.0.1");
+	socketAddrClient.sin_port = htons(443);
+	socketAddrClient.sin_addr.s_addr = inet_addr("192.168.31.83");
  
 	err = connect(listen_sd, (struct sockaddr *)&socketAddrClient, sizeof(socketAddrClient));
 	CHK_ERR(err, "connect");
