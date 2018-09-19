@@ -246,24 +246,30 @@ int mangoPort_connect(char* serverIP, uint16_t serverPort, uint32_t timeout){
     int retval;
     struct sockaddr_in s_addr_in;
     int socketfd;
-    uint8_t *pch;
+	struct hostent *h;
     
+	h = gethostbyname(serverIP);
+	if (h == NULL)
+	{
+		return -1;
+	}
+
     socketfd = socket(AF_INET, SOCK_STREAM, 0);
     
     memset(&s_addr_in, 0, sizeof(s_addr_in));
-    s_addr_in.sin_family      = AF_INET;
-    s_addr_in.sin_port        = htons (serverPort);
-    s_addr_in.sin_addr.s_addr = inet_addr(serverIP);
+    s_addr_in.sin_family = AF_INET;
+    s_addr_in.sin_port   = htons (serverPort);
+    s_addr_in.sin_addr   = *(struct in_addr*)(h->h_addr_list[0]);//inet_addr(serverIP);
 
     retval = connect(socketfd, (struct sockaddr *) &s_addr_in, sizeof(s_addr_in));
 
     if(retval == 0){
-        retval = fcntl(socketfd, F_SETFL, O_NONBLOCK);
-        if(retval == 0){   
-        }
-        return socketfd;
+		// O_NONBLOCK socket cause ssl handshake failed.
+        // retval = fcntl(socketfd, F_SETFL, O_NONBLOCK);
+        // if(retval == 0){   
+        // }
+		return socketfd;
     }else{
-        printf("connect:%s,%d", strerror(errno), errno);
         close(socketfd);
         return -1;
     }
@@ -459,6 +465,10 @@ failed:
 
 void sslcert_free(ssl_ca_crt_key_t *s)
 {
+	if (s == NULL)
+	{
+		return ;
+	}
 	if (s->cacrt)
 	{
 		free((void*)(s->cacrt));

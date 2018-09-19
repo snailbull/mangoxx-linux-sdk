@@ -278,25 +278,14 @@ int sslget_test(char *server, uint16_t port, char *url)
     s_server_port = port;
     strcpy(s_url, url);
 
-    OpenSSL_add_ssl_algorithms();
-    SSL_load_error_strings();
+	SSL_library_init();
 
-	ssl_ca_crt_key_t *cck;
-	cck = sslcert_load("./mango_test/cert/ca.crt", NULL, NULL);
-	if (cck == NULL)
-	{
-		printf("sslfile_load error!\n");
-		return MANGO_ERR;
-	}
-	/*
-	Fragment size range 2048~8192
-	| Private key len | Fragment size recommend |
-	| RSA2048         | 2048                    |
-	| RSA3072         | 3072                    |
-	| RSA4096         | 4096                    |
-	*/
-	httpClient = mango_sslconnect(s_server_ip, s_server_port, cck, TLSv1_2_client_method(), SSL_VERIFY_NONE, 2048);
-	sslcert_free(cck);
+	ssl_ca_crt_key_file_t cck_file={
+		"./mango_test/cert/owin.cer", "./mango_test/cert/",
+		// "./mango_test/cert/client.crt",
+		// "./mango_test/cert/client.key"
+	};
+	httpClient = mango_sslconnect(s_server_ip, s_server_port, NULL, &cck_file, SSLv23_client_method(), SSL_VERIFY_CLIENT_ONCE, 2048);
 	if (!httpClient)
 	{
 		printf("mangoHttpClient_connect() FAILED!");
