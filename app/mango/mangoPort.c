@@ -122,50 +122,40 @@ void mangoPort_free(void* ptr){
 int mangoPort_read(int socketfd, uint8_t* data, uint16_t datalen, uint32_t timeout){
     uint32_t received;
     uint32_t start;
-    int socketerror;
     int retval;
-	
+    struct timeval t;
+    fd_set fdset;
+
     MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("Trying to read %u bytes\r\n", datalen) );
-    
     received = 0;
     start = mangoPort_timeNow();
-	while(received < datalen){
-    
-        retval = recv(socketfd, &data[received], datalen - received, 0);
-        //printf("READ %d\r\n", retval);
-        if(retval < 0){
-            //socketerrorlen = sizeof(socketerror);
-            //retval = getsockopt(socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
-#ifdef MANGO_IP_ENV__UNIX
-            socketerror = errno;
-#endif
-            
-#ifdef MANGO_IP_ENV__LWIP
-            socklen_t socketerrorlen;
-            socketerrorlen = sizeof(socketerror);
-            retval = getsockopt(socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
-#endif
-            
-            MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("!!!!!!! READ SOCKET ERROR %d\r\n", socketerror) );
-            
-            if(socketerror == EWOULDBLOCK || socketerror == EAGAIN){
-                mangoPort_sleep(64);
-            }else{
-                return -1;
-            }
-        }else{
-            received += retval;
-            return received;
-        }
-        
-        if(mangoHelper_elapsedTime(start) > timeout){
-            return received;
-        }
+
+    FD_ZERO(&fdset);
+    FD_SET(socketfd, &fdset);
+    t.tv_sec = 0;
+    t.tv_usec = timeout * 1000;
+
+	if (select(socketfd+1, &fdset, NULL, NULL, &t) > 0)
+	{
+		if (FD_ISSET(socketfd, &fdset))
+		{
+			do {
+				retval = recv(socketfd, &data[received], datalen - received, 0);
+				if (retval > 0)
+				{
+					received += retval;
+				}
+				else if (retval < 0)
+				{
+					received = retval;
+					break;
+				}
+			} while((received < datalen) && (mangoHelper_elapsedTime(start) < timeout));
+		}
 	}
-	
-	MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("%u bytes read\r\n", retval) );
-	
-	return retval;
+	MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("%u bytes read\r\n", received) );
+
+	return received;
 }
 
 
@@ -187,11 +177,15 @@ int mangoPort_write(int socketfd, uint8_t* data, uint16_t datalen, uint32_t time
     uint32_t start;
     int socketerror;
     int retval;
-    
+    struct timeval timeout;
+    fd_set fdset;
+
 	MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("Trying to write %u bytes\r\n", datalen) );
 	
     sent = 0;
     start = mangoPort_timeNow();
+
+
     while(sent < datalen){
         retval = write(socketfd, &data[sent], datalen - sent);
         if(retval < 0){
