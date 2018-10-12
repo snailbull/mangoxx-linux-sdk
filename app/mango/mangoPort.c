@@ -177,46 +177,40 @@ int mangoPort_write(int socketfd, uint8_t* data, uint16_t datalen, uint32_t time
     uint32_t start;
     int socketerror;
     int retval;
-    struct timeval timeout;
+    struct timeval t;
     fd_set fdset;
+    int readysock;
 
 	MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("Trying to write %u bytes\r\n", datalen) );
 	
+    FD_ZERO(&fdset);
+    FD_SET(socketfd, &fdset);
+    t.tv_sec = 0;
+    t.tv_usec = timeout * 1000;
+
     sent = 0;
     start = mangoPort_timeNow();
 
+    do {
+        readysock = select(socketfd+1, NULL, &fdset, NULL, &t);
+    }while(readysock <= 0);
 
-    while(sent < datalen){
-        retval = write(socketfd, &data[sent], datalen - sent);
-        if(retval < 0){
-            //socketerrorlen = sizeof(socketerror);
-            //retval = getsockopt(socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
-#ifdef MANGO_IP_ENV__UNIX
-            socketerror = errno;
-#endif
-            
-#ifdef MANGO_IP_ENV__LWIP
-            socklen_t socketerrorlen;
-            socketerrorlen = sizeof(socketerror);
-            retval = getsockopt(socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
-#endif
-            
-            MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("!!!!!!! WRITE SOCKET ERROR %d\r\n", socketerror) );
-            
-            if(socketerror == EWOULDBLOCK || socketerror == EAGAIN){
-                mangoPort_sleep(64);
-            }else{
-                return -1;
+    if (FD_ISSET(socketfd, &fdset))
+    {
+        do {
+            retval = send(socketfd, &data[sent], datalen - sent, 0);
+            if (retval > 0)
+            {
+                sent += retval;
             }
-        }else{
-            sent += retval;
-        }
-        
-        if(mangoHelper_elapsedTime(start) > timeout){
-            return sent;
-        }
-    };
-    
+            else if (retval < 0)
+            {
+                sent = rc;
+                break;
+            }
+        }while((sent < datalen) && (mangoHelper_elapsedTime(start) < timeout));
+    }
+
     return sent;
 }
 
