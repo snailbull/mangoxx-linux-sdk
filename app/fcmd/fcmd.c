@@ -1,15 +1,15 @@
 /*******************************************************************************
---函数命令行V0.03
+--函数命令行
 --fcmd.c
---zrpeng
+--Robin Zhou
 --2015-3-5
 --
 --note:
-	该模块主要用于调试用途，可以方便的进行手动测试，向调用C语言函数一样在运行阶段执行
+	该模块主要用于调试用途，可以方便的进行手动测试，像调用C语言函数一样在运行阶段执行
 	想要执行的C函数。
 	比如:调试单片机的PWM时，执行int timer_pwm_set(int pwm)
           输入timer_pwm_set(88)，就可以改变占空比了
-	该模块存在危险，对寄存器传参过程有所了解，误传参数导致程序出错！
+	该模块存在危险，需要对寄存器传参过程有所了解，误传内存地址会导致程序出错！
 
 --history:
 	0.01运行正常，只能支持int32_t类型参数
@@ -18,67 +18,74 @@
 		增加了内存显示命令,c库函数都可以正常调用测试
 		目前运行正常
 	0.03增加对可变参数的支持,eg:int printf(const char *fmt, ...)
+	1.0.4增加密码登录，分离系统命令和函数命令表
 *******************************************************************************/
 #include "fcmd.h"
 #include "cmd_mem.h"
 
-#define PARAMS_NUM  10 //函数支持10个参数
-#define SYSTEM_CMD  2  //系统命令的个数, CmdTbl增加系统命令的同时也要增加这个变量
-
+#define PARAMS_NUM  10	//函数支持10个参数
 #define _args_t  int	//参数类型，对于16bit和8bit单片机要注意
+#define FCMD_VERSION	"1.0.4"
 
-/*******************************************************************************
- * 一个函数命令行结构
- */
 typedef struct
 {
 	char *fname;
 	void (*pfunc)(void);
 } CmdTbl_t;
 
-#include "fcmd_cfg.h"
-
-
-/*******************************************************************************
- * 静态函数声明
- */
-static void system_cmd_exe(uint8_t n);
 static int8_t get_args_num(uint8_t *str, uint8_t *key);
 static void get_args(uint8_t *str, uint8_t *key, _args_t *args);
 static uint8_t *get_fname(uint8_t *str, uint8_t *len);
+static void sys_ls(void);
+static void sys_h(void);
+static void sys_q(void);
 
-/*
- * 执行模块定义的指令
- * @n 指令序号，指令CmdTbl中的序号
+#include "fcmd_cfg.h"
+
+/**
+ * root@c0dec0ffee
+ * q退出
  */
-static void system_cmd_exe(uint8_t n)
+struct fcmd_t
+{
+	int login_flag;
+	char login_id[32];
+	char login_passwd[64];
+};
+static struct fcmd_t s_fcmd={0, {"root"}, {"c0dec0ffee"}};
+
+/******************************************************************************
+ * 系统命令
+ */
+static void sys_ls(void)
 {
 	uint8_t i;
-
-	switch (n)
+	PRINTF("------------- function list --------------\n");
+	for (i = 0; i < CmdSysTblSize; i++)
 	{
-	case 0:
-		PRINTF("------------- function list --------------\n");
-		for (i = 0; i < CmdTblSize; i++)
-		{
-			PRINTF("0x%08x: %s\n", (int)CmdTbl[i].pfunc, CmdTbl[i].fname);
-		}
-		PRINTF("-------------------------------------------\n");
-		break;
-
-	case 1:
-		PRINTF(
-		    "---------------------------------------------\n"
-		    "fcmd V0.03  zrpeng\n"
-		    "Used:\n"
-		    "  md(0x00141280, 512, 1)\n"
-		    "  memset(0x00141280, 65, 512)\n"
-		    "  malloc(1024)\n"
-		    "  free(0x00141280)\n"
-		    "---------------------------------------------\n"
-		);
-		break;
+		PRINTF("0x%08x: %s\n", (int)CmdSysTbl[i].pfunc, CmdSysTbl[i].fname);
 	}
+	for (i = 0; i < CmdTblSize; i++)
+	{
+		PRINTF("0x%08x: %s\n", (int)CmdTbl[i].pfunc, CmdTbl[i].fname);
+	}
+	PRINTF("-------------------------------------------\n");
+}
+static void sys_h(void)
+{
+	PRINTF(
+		"---------------------------------------------\n"
+		"fcmd v%s  Robin Zhou\n"
+		"Used:\n"
+		"  md(0x00141280, 512, 1)\n"
+		"  memset(0x00141280, 65, 512)\n"
+		"  malloc(1024)\n"
+		"  free(0x00141280)\n"
+		"---------------------------------------------\n", FCMD_VERSION);
+}
+static void sys_q(void)
+{
+	s_fcmd.login_flag = 0;
 }
 
 /*
@@ -427,7 +434,7 @@ void fcmd_exec(uint8_t *cmd)
 {
 	uint8_t *pcmd = cmd;
 	_args_t args[PARAMS_NUM + 1]; 	//参数数组
-	_args_t ret = 0;					//函数返回值
+	_args_t ret = 0;
 	uint8_t i;
 	int8_t cmdtbl_param_num;
 	
@@ -437,6 +444,21 @@ void fcmd_exec(uint8_t *cmd)
 	while (*pcmd == ' ')
 	{
 		pcmd++;
+	}
+
+	// 是否已经登录
+	if (s_fcmd.login_flag == 0)
+	{
+		char id_len=strlen(s_fcmd.login_id), passwd_len=strlen(s_fcmd.login_passwd);
+		if ((strlen((char*)cmd) == (id_len+passwd_len+1)) &&
+			(strncmp((char*)cmd, s_fcmd.login_id, id_len) == 0) &&
+			(cmd[id_len] == '@') &&
+			(strncmp((char*)&cmd[id_len+1], s_fcmd.login_passwd, passwd_len) == 0))
+		{
+			s_fcmd.login_flag = 1;
+			PRINTF("Hello World!\n");
+		}
+		return ;
 	}
 
 	//分离参数
@@ -449,19 +471,18 @@ void fcmd_exec(uint8_t *cmd)
 		return ;
 	}
 
-	//匹配命令
 	if (args[0] == -1)
 	{
 		//系统命令
-		for (i = 0; i < SYSTEM_CMD; i++)
+		for (i = 0; i < CmdSysTblSize; i++)
 		{
-			if (strncmp((char *)pcmd, CmdTbl[i].fname, strlen((char *)pcmd)) == 0)
+			if (strncmp((char *)pcmd, CmdSysTbl[i].fname, strlen((char *)pcmd)) == 0)
 			{
 				break;
 			}
 		}
 
-		if (i >= SYSTEM_CMD)
+		if (i >= CmdSysTblSize)
 		{
 			PRINTF("err:system cmd err\n");
 			return ;
@@ -469,8 +490,8 @@ void fcmd_exec(uint8_t *cmd)
 	}
 	else
 	{
-		//普通命令
-		for (i = SYSTEM_CMD; i < CmdTblSize; i++)
+		//函数命令
+		for (i = 0; i < CmdTblSize; i++)
 		{
 			uint8_t *pcmd_end;
 			uint8_t pfname_len;
@@ -495,7 +516,7 @@ void fcmd_exec(uint8_t *cmd)
 		//没有匹配到命令
 		if (i >= CmdTblSize)
 		{
-			PRINTF("err:not you wanted cmd\n");
+			PRINTF("err:no such cmd\n");
 			return;
 		}
 	}
@@ -503,7 +524,7 @@ void fcmd_exec(uint8_t *cmd)
 	//得到函数表里的函数的参数个数
 	if (args[0] != -1)
 	{
-		//普通命令
+		//函数命令
 		cmdtbl_param_num = get_args_num((uint8_t *)CmdTbl[i].fname, (uint8_t *)"(,)");
 		if (cmdtbl_param_num == -2)
 		{
@@ -518,14 +539,14 @@ void fcmd_exec(uint8_t *cmd)
 	else
 	{
 		//执行系统命令
-		system_cmd_exe(i);
+		(*(_args_t(*)())CmdSysTbl[i].pfunc)();
 		return;
 	}
 
-	//传入相应参数，执行普通命令
+	//执行函数命令
 	switch (args[0])
 	{
-	case 0://没有参数
+	case 0:
 		ret = (*(_args_t(*)())CmdTbl[i].pfunc)();
 		break;
 
