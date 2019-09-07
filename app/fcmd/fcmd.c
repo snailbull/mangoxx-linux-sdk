@@ -1,30 +1,30 @@
 /*******************************************************************************
---º¯ÊıÃüÁîĞĞ
+--å‡½æ•°å‘½ä»¤è¡Œ
 --fcmd.c
 --Robin Zhou
 --2015-3-5
 --
 --note:
-	¸ÃÄ£¿éÖ÷ÒªÓÃÓÚµ÷ÊÔÓÃÍ¾£¬¿ÉÒÔ·½±ãµÄ½øĞĞÊÖ¶¯²âÊÔ£¬Ïñµ÷ÓÃCÓïÑÔº¯ÊıÒ»ÑùÔÚÔËĞĞ½×¶ÎÖ´ĞĞ
-	ÏëÒªÖ´ĞĞµÄCº¯Êı¡£
-	±ÈÈç:µ÷ÊÔµ¥Æ¬»úµÄPWMÊ±£¬Ö´ĞĞint timer_pwm_set(int pwm)
-          ÊäÈëtimer_pwm_set(88)£¬¾Í¿ÉÒÔ¸Ä±äÕ¼¿Õ±ÈÁË
-	¸ÃÄ£¿é´æÔÚÎ£ÏÕ£¬ĞèÒª¶Ô¼Ä´æÆ÷´«²Î¹ı³ÌÓĞËùÁË½â£¬Îó´«ÄÚ´æµØÖ·»áµ¼ÖÂ³ÌĞò³ö´í£¡
+	è¯¥æ¨¡å—ä¸»è¦ç”¨äºè°ƒè¯•ç”¨é€”ï¼Œå¯ä»¥æ–¹ä¾¿çš„è¿›è¡Œæ‰‹åŠ¨æµ‹è¯•ï¼Œåƒè°ƒç”¨Cè¯­è¨€å‡½æ•°ä¸€æ ·åœ¨è¿è¡Œé˜¶æ®µæ‰§è¡Œ
+	æƒ³è¦æ‰§è¡Œçš„Cå‡½æ•°ã€‚
+	æ¯”å¦‚:è°ƒè¯•å•ç‰‡æœºçš„PWMæ—¶ï¼Œæ‰§è¡Œint timer_pwm_set(int pwm)
+          è¾“å…¥timer_pwm_set(88)ï¼Œå°±å¯ä»¥æ”¹å˜å ç©ºæ¯”äº†
+	è¯¥æ¨¡å—å­˜åœ¨å±é™©ï¼Œéœ€è¦å¯¹å¯„å­˜å™¨ä¼ å‚è¿‡ç¨‹æœ‰æ‰€äº†è§£ï¼Œè¯¯ä¼ å†…å­˜åœ°å€ä¼šå¯¼è‡´ç¨‹åºå‡ºé”™ï¼
 
 --history:
-	0.01ÔËĞĞÕı³££¬Ö»ÄÜÖ§³Öint32_tÀàĞÍ²ÎÊı
-	0.02ĞÂÔö¼Ó×Ö·û´®ÀàĞÍµÄÖ§³Ö,eg:disp(50,-60, "ADC:  mV", 10, "89"),
-		µ÷»»ÁËCmdTblÄÚ²¿³ÉÔ±µÄË³Ğò£¬×Ö·û´®ÔÚÇ°£¬º¯ÊıÖ¸ÕëÔÚºó
-		Ôö¼ÓÁËÄÚ´æÏÔÊ¾ÃüÁî,c¿âº¯Êı¶¼¿ÉÒÔÕı³£µ÷ÓÃ²âÊÔ
-		Ä¿Ç°ÔËĞĞÕı³£
-	0.03Ôö¼Ó¶Ô¿É±ä²ÎÊıµÄÖ§³Ö,eg:int printf(const char *fmt, ...)
-	1.0.4Ôö¼ÓÃÜÂëµÇÂ¼£¬·ÖÀëÏµÍ³ÃüÁîºÍº¯ÊıÃüÁî±í
+	0.01è¿è¡Œæ­£å¸¸ï¼Œåªèƒ½æ”¯æŒint32_tç±»å‹å‚æ•°
+	0.02æ–°å¢åŠ å­—ç¬¦ä¸²ç±»å‹çš„æ”¯æŒ,eg:disp(50,-60, "ADC:  mV", 10, "89"),
+		è°ƒæ¢äº†CmdTblå†…éƒ¨æˆå‘˜çš„é¡ºåºï¼Œå­—ç¬¦ä¸²åœ¨å‰ï¼Œå‡½æ•°æŒ‡é’ˆåœ¨å
+		å¢åŠ äº†å†…å­˜æ˜¾ç¤ºå‘½ä»¤,cåº“å‡½æ•°éƒ½å¯ä»¥æ­£å¸¸è°ƒç”¨æµ‹è¯•
+		ç›®å‰è¿è¡Œæ­£å¸¸
+	0.03å¢åŠ å¯¹å¯å˜å‚æ•°çš„æ”¯æŒ,eg:int printf(const char *fmt, ...)
+	1.0.4å¢åŠ å¯†ç ç™»å½•ï¼Œåˆ†ç¦»ç³»ç»Ÿå‘½ä»¤å’Œå‡½æ•°å‘½ä»¤è¡¨
 *******************************************************************************/
 #include "fcmd.h"
 #include "cmd_mem.h"
 
-#define PARAMS_NUM  10	//º¯ÊıÖ§³Ö10¸ö²ÎÊı
-#define _args_t  int	//²ÎÊıÀàĞÍ£¬¶ÔÓÚ16bitºÍ8bitµ¥Æ¬»úÒª×¢Òâ
+#define PARAMS_NUM  10	//å‡½æ•°æ”¯æŒ10ä¸ªå‚æ•°
+#define _args_t  int	//å‚æ•°ç±»å‹ï¼Œå¯¹äº16bitå’Œ8bitå•ç‰‡æœºè¦æ³¨æ„
 #define FCMD_VERSION	"1.0.4"
 
 typedef struct
@@ -44,7 +44,7 @@ static void sys_q(void);
 
 /**
  * root@c0dec0ffee
- * qÍË³ö
+ * qé€€å‡º
  */
 struct fcmd_t
 {
@@ -55,7 +55,7 @@ struct fcmd_t
 static struct fcmd_t s_fcmd={0, {"root"}, {"c0dec0ffee"}};
 
 /******************************************************************************
- * ÏµÍ³ÃüÁî
+ * ç³»ç»Ÿå‘½ä»¤
  */
 static void sys_ls(void)
 {
@@ -89,19 +89,19 @@ static void sys_q(void)
 }
 
 /*
- * »ñÈ¡º¯ÊıµÄ²ÎÊı¸öÊı
- * @str º¯ÊıÃüÁî×Ö·û´®
- * @key ²ÎÊı·Ö¸ô·û£¬eg: (,) ×Ö·û´®ÄÚ²¿µÄ,²»Ëã eg:"auther:zrp,2015"
+ * è·å–å‡½æ•°çš„å‚æ•°ä¸ªæ•°
+ * @str å‡½æ•°å‘½ä»¤å­—ç¬¦ä¸²
+ * @key å‚æ•°åˆ†éš”ç¬¦ï¼Œeg: (,) å­—ç¬¦ä¸²å†…éƒ¨çš„,ä¸ç®— eg:"auther:zrp,2015"
  *
- * return ²ÎÊıµÄ¸öÊı
- *        -2   ¿É±ä²ÎÊı(²ÎÊı¸öÊı²»¶¨)
- *        -1   Ò»¸ö·Ö¸ô·ûÒ²Ã»ÓĞ£¬eg£ºlsÃüÁî¾ÍÃ»ÓĞ()·Ö¸ô·û
- *        >=0  ²ÎÊı¸öÊı£¬eg:timer_pwm_set(5,67)£¬·Ö¸ô·ûÊÇ(,)ºÜÃ÷ÏÔÓĞ2¸ö²ÎÊı
+ * return å‚æ•°çš„ä¸ªæ•°
+ *        -2   å¯å˜å‚æ•°(å‚æ•°ä¸ªæ•°ä¸å®š)
+ *        -1   ä¸€ä¸ªåˆ†éš”ç¬¦ä¹Ÿæ²¡æœ‰ï¼Œegï¼šlså‘½ä»¤å°±æ²¡æœ‰()åˆ†éš”ç¬¦
+ *        >=0  å‚æ•°ä¸ªæ•°ï¼Œeg:timer_pwm_set(5,67)ï¼Œåˆ†éš”ç¬¦æ˜¯(,)å¾ˆæ˜æ˜¾æœ‰2ä¸ªå‚æ•°
  */
 static int8_t get_args_num(uint8_t *str, uint8_t *key)
 {
 	uint8_t *pch;
-	uint8_t *pbrk[PARAMS_NUM * 2]; //Ö¸Ïò¶Ïµã(,)
+	uint8_t *pbrk[PARAMS_NUM * 2]; //æŒ‡å‘æ–­ç‚¹(,)
 	int8_t brk_cnt;
 
 	brk_cnt = 0;
@@ -145,7 +145,7 @@ static int8_t get_args_num(uint8_t *str, uint8_t *key)
 	}
 	else if (brk_cnt == 3)
 	{
-		//ÅĞ¶Ï¿É±ä²ÎÊıµÄÇé¿ö,eg:int printf(const char *fmt, ...)
+		//åˆ¤æ–­å¯å˜å‚æ•°çš„æƒ…å†µ,eg:int printf(const char *fmt, ...)
 		if (strstr((char *)pbrk[0], ".." ) != NULL)
 		{
 			return -2;
@@ -156,11 +156,11 @@ static int8_t get_args_num(uint8_t *str, uint8_t *key)
 }
 
 /*
- * ÅĞ¶Ï×Ö·û´®Çø¼äÊÇ·ñÎª¿Õ, \r \n \f \v \t ' '
- * @head  Çø¼äÍ·Ö¸Õë
- * @tail  Çø¼äÎ²²¿
- * return Îª¿Õ·µ»ØTRUE, ²»Îª¿Õ·µ»ØFALSE
- * note   [head, tail), ×ó±ÕÓÒ¿ª
+ * åˆ¤æ–­å­—ç¬¦ä¸²åŒºé—´æ˜¯å¦ä¸ºç©º, \r \n \f \v \t ' '
+ * @head  åŒºé—´å¤´æŒ‡é’ˆ
+ * @tail  åŒºé—´å°¾éƒ¨
+ * return ä¸ºç©ºè¿”å›TRUE, ä¸ä¸ºç©ºè¿”å›FALSE
+ * note   [head, tail), å·¦é—­å³å¼€
  */
 static int8_t span_isspace(uint8_t *head, uint8_t *tail)
 {
@@ -179,44 +179,44 @@ static int8_t span_isspace(uint8_t *head, uint8_t *tail)
 }
 
 /*
- * ·ÖÀë²ÎÊı£¬Ö§³Öint32_tºÍ×Ö·û´®, eg:disp(10,-60, "string", 10, "sub:(a,b)")
- * @str º¯Êı×Ö·û´®
- * @key ·Ö¸ô·û×Ö·û´®£¬eg: (,)"
+ * åˆ†ç¦»å‚æ•°ï¼Œæ”¯æŒint32_tå’Œå­—ç¬¦ä¸², eg:disp(10,-60, "string", 10, "sub:(a,b)")
+ * @str å‡½æ•°å­—ç¬¦ä¸²
+ * @key åˆ†éš”ç¬¦å­—ç¬¦ä¸²ï¼Œeg: (,)"
  *
- * note  ×Ö·û´®²ÎÊı²»Ö§³Ö×ªÒå×Ö·û, Ö±½ÓÊäÈë"'\¼´¿ÉÊ¶±ğ, eg:"'\rÖ±½ÓÊ¶±ğ³É4¸ö×Ö·û.
- *       ºÏ·¨×Ö·û´®Ê¾·¶:disp("value:"56V,""), disp("value:\"56\""),
- *       Òª±£Ö¤"³É¶Ô³öÏÖ,·ñÔò±¨´í
+ * note  å­—ç¬¦ä¸²å‚æ•°ä¸æ”¯æŒè½¬ä¹‰å­—ç¬¦, ç›´æ¥è¾“å…¥"'\å³å¯è¯†åˆ«, eg:"'\rç›´æ¥è¯†åˆ«æˆ4ä¸ªå­—ç¬¦.
+ *       åˆæ³•å­—ç¬¦ä¸²ç¤ºèŒƒ:disp("value:"56V,""), disp("value:\"56\""),
+ *       è¦ä¿è¯"æˆå¯¹å‡ºç°,å¦åˆ™æŠ¥é”™
  */
 static void get_args(uint8_t *str, uint8_t *key, _args_t *args)
 {
 	uint8_t *pch;
-	uint8_t *pbrk[PARAMS_NUM * 3]; //Ö¸Ïò·Ö¸ô·û(,)"
+	uint8_t *pbrk[PARAMS_NUM * 3]; //æŒ‡å‘åˆ†éš”ç¬¦(,)"
 	int8_t brk_cnt;
 
 	brk_cnt = 0;
 	pch = (uint8_t *)strpbrk ((char *)str, (char *)key);
-	while ((pch != NULL) && (brk_cnt < PARAMS_NUM * 3))	//·Ö¸ô·û²»ÄÜÌ«¶à
+	while ((pch != NULL) && (brk_cnt < PARAMS_NUM * 3))	//åˆ†éš”ç¬¦ä¸èƒ½å¤ªå¤š
 	{
 		pbrk[brk_cnt] = pch;
 		brk_cnt++;
 		pch = (uint8_t *)strpbrk ((char *)(pch + 1), (char *)key);
 	}
 
-	if (brk_cnt == 0)//Ã»ÓĞ(,)¾ÍÊÇÏµÍ³ÃüÁî
+	if (brk_cnt == 0)//æ²¡æœ‰(,)å°±æ˜¯ç³»ç»Ÿå‘½ä»¤
 	{
 		args[0] = -1;
 	}
-	else if (brk_cnt == 1)//Ö»ÓĞÓĞÒ»¸ö·Ö¸ô·ûËµÃ÷ÊäÈë´íÎó
+	else if (brk_cnt == 1)//åªæœ‰æœ‰ä¸€ä¸ªåˆ†éš”ç¬¦è¯´æ˜è¾“å…¥é”™è¯¯
 	{
-		args[0] = -2;//º¯Êı´íÎó
+		args[0] = -2;//å‡½æ•°é”™è¯¯
 	}
-	else//2¸ö¼°ÒÔÉÏ
+	else//2ä¸ªåŠä»¥ä¸Š
 	{
 		if (*pbrk[0] == '(' && *pbrk[brk_cnt - 1] == ')')
 		{
 			args[0] = 0;
 
-			if (brk_cnt == 2)//2¸ö£¬Á½ÖÖ¿ÉÄÜ£ºÒ»¸ö²ÎÊı»òÃ»ÓĞ²ÎÊı
+			if (brk_cnt == 2)//2ä¸ªï¼Œä¸¤ç§å¯èƒ½ï¼šä¸€ä¸ªå‚æ•°æˆ–æ²¡æœ‰å‚æ•°
 			{
 				uint8_t *t = pbrk[0] + 1;
 
@@ -229,13 +229,13 @@ static void get_args(uint8_t *str, uint8_t *key, _args_t *args)
 					}
 					else
 					{
-						args[0] = 1;//ÓĞÒ»¸ö²ÎÊı
+						args[0] = 1;//æœ‰ä¸€ä¸ªå‚æ•°
 						args[1] = strtol((char *)(pbrk[0] + 1), NULL, 0);
 						break;
 					}
 				}
 			}
-			else//3¸ö¼°ÒÔÉÏ, ´¦Àí×î¸´ÔÓµÄÇé¿ö
+			else//3ä¸ªåŠä»¥ä¸Š, å¤„ç†æœ€å¤æ‚çš„æƒ…å†µ
 			{
 				uint8_t quotation_cnt;
 				uint8_t i;
@@ -243,7 +243,7 @@ static void get_args(uint8_t *str, uint8_t *key, _args_t *args)
 				uint8_t state;
 				uint8_t finding;
 
-				//Ë«ÒıºÅÊıÁ¿ÊÇ·ñ³É¶Ô
+				//åŒå¼•å·æ•°é‡æ˜¯å¦æˆå¯¹
 				quotation_cnt = 0;
 				for (i = 1; i < brk_cnt; i++)
 				{
@@ -253,14 +253,14 @@ static void get_args(uint8_t *str, uint8_t *key, _args_t *args)
 					}
 				}
 
-				if (quotation_cnt == 0)//Ã»ÓĞ×Ö·û´®²ÎÊı
+				if (quotation_cnt == 0)//æ²¡æœ‰å­—ç¬¦ä¸²å‚æ•°
 				{
 					for (i = 0; i < brk_cnt; i++)
 					{
-						*pbrk[i] = '\0';    //Ìæ»»³É×Ö·û´®½áÊø·û
+						*pbrk[i] = '\0';    //æ›¿æ¢æˆå­—ç¬¦ä¸²ç»“æŸç¬¦
 					}
 
-					for (i = 0; i < brk_cnt; i++)//×ª»»³ÉÕûĞÍÊı
+					for (i = 0; i < brk_cnt; i++)//è½¬æ¢æˆæ•´å‹æ•°
 					{
 						args[i + 1] = strtol((char *)(pbrk[i] + 1), NULL, 0);
 					}
@@ -269,24 +269,24 @@ static void get_args(uint8_t *str, uint8_t *key, _args_t *args)
 
 					return ;
 				}
-				else if ((quotation_cnt % 2) != 0) //Ã»ÓĞ³É¶Ô³öÏÖ"
+				else if ((quotation_cnt % 2) != 0) //æ²¡æœ‰æˆå¯¹å‡ºç°"
 				{
-					args[0] = -2;//º¯Êı´íÎó
+					args[0] = -2;//å‡½æ•°é”™è¯¯
 					return ;
 				}
 
-				//²ÎÊı×ª»», ´ËÊ±·Ö¸ô·ûÊıÁ¿>=3
+				//å‚æ•°è½¬æ¢, æ­¤æ—¶åˆ†éš”ç¬¦æ•°é‡>=3
 				args_cnt = 1;
 				state = 0;
 				i = 0;
-				while (i < brk_cnt - 1)	//ÉÙÒ»¸ö, ½áÎ²µÄ')'²»¿¼ÂÇ
+				while (i < brk_cnt - 1)	//å°‘ä¸€ä¸ª, ç»“å°¾çš„')'ä¸è€ƒè™‘
 				{
 					finding = 1;
 					while (finding)
 					{
 						switch (state)
 						{
-						case 0://Ê¶±ğ",
+						case 0://è¯†åˆ«",
 							{
 								if (i == 0)
 								{
@@ -315,66 +315,66 @@ static void get_args(uint8_t *str, uint8_t *key, _args_t *args)
 							}
 							break;
 
-						case 1://ÕûĞÍ²ÎÊı
+						case 1://æ•´å‹å‚æ•°
 							{
 								args[args_cnt] = strtol((char *)(pbrk[i] + 1), NULL, 0);
 								args_cnt++;
 
-								i++;			//ÏÂÒ»¸ö,
-								finding = 0;	//Ìø³öÑ­»·£¬ÅĞ¶ÏÒ»ÏÂ´ËÊ±iµÄ·¶Î§
+								i++;			//ä¸‹ä¸€ä¸ª,
+								finding = 0;	//è·³å‡ºå¾ªç¯ï¼Œåˆ¤æ–­ä¸€ä¸‹æ­¤æ—¶içš„èŒƒå›´
 								state = 0;
 							}
 							break;
 
-						case 2://×Ö·û´®²ÎÊı
+						case 2://å­—ç¬¦ä¸²å‚æ•°
 							{
 								uint8_t is_string_end;
 
 								args[args_cnt] = (_args_t)(pbrk[i] + 1);
 								args_cnt++;
 
-								//ÕÒ³ö",¼´¿ÉÅĞ¶Ï×Ö·û´®½áÊøÁË
+								//æ‰¾å‡º",å³å¯åˆ¤æ–­å­—ç¬¦ä¸²ç»“æŸäº†
 								is_string_end = 0;
-								while (!is_string_end)	//ÕÒ³ö×Ö·û´®½áÎ²
+								while (!is_string_end)	//æ‰¾å‡ºå­—ç¬¦ä¸²ç»“å°¾
 								{
 									i++;
-									while (*pbrk[i] != '\"')//ÕÒ³öÅä¶ÔµÄ"
+									while (*pbrk[i] != '\"')//æ‰¾å‡ºé…å¯¹çš„"
 									{
 										i++;
 									}
 
-									i++;		//ÏÂÒ»¸ö,
+									i++;		//ä¸‹ä¸€ä¸ª,
 									if (i >= brk_cnt - 1)
 									{
 										is_string_end = 1;
-										*pbrk[i - 1] = 0;	//×Ö·û´®Î²²¿"Ìæ»»³É½áÊø·û
-										break;				//$! µ½ÃüÁîĞĞ½áÎ²ÁË,ÍË³öÕû¸öº¯Êı
+										*pbrk[i - 1] = 0;	//å­—ç¬¦ä¸²å°¾éƒ¨"æ›¿æ¢æˆç»“æŸç¬¦
+										break;				//$! åˆ°å‘½ä»¤è¡Œç»“å°¾äº†,é€€å‡ºæ•´ä¸ªå‡½æ•°
 									}
 
-									if (*pbrk[i] == ',')	//µ½×Ö·û´®Î²²¿ÁË?
+									if (*pbrk[i] == ',')	//åˆ°å­—ç¬¦ä¸²å°¾éƒ¨äº†?
 									{
-										//½øÒ»²½ÅĞ¶Ï"ºÍ,Ö®¼äÊÇ²»ÊÇ¿Õ×Ö·û
+										//è¿›ä¸€æ­¥åˆ¤æ–­"å’Œ,ä¹‹é—´æ˜¯ä¸æ˜¯ç©ºå­—ç¬¦
 										if (span_isspace(pbrk[i - 1] + 1, pbrk[i]))
 										{
-											is_string_end = 1;	//$! È·ÊµÊÇ×Ö·û´®Î²²¿
-											*pbrk[i - 1] = 0;	// ×Ö·û´®Î²²¿"Ìæ»»³É½áÊø·û
+											is_string_end = 1;	//$! ç¡®å®æ˜¯å­—ç¬¦ä¸²å°¾éƒ¨
+											*pbrk[i - 1] = 0;	// å­—ç¬¦ä¸²å°¾éƒ¨"æ›¿æ¢æˆç»“æŸç¬¦
 											break;
 										}
 										else
 										{
-											//"  """" "ºÍ,Ö®¼äÓĞ×Ö·û
+											//"  """" "å’Œ,ä¹‹é—´æœ‰å­—ç¬¦
 											i++;
-											while (*pbrk[i] != '\"')//ÕÒ³öµÚÒ»¸ö"
+											while (*pbrk[i] != '\"')//æ‰¾å‡ºç¬¬ä¸€ä¸ª"
 											{
 												i++;
 											}
 										}
 									}
-									else if (*pbrk[i] == '\"')	//ÓÖÊÇµÚÒ»¸ö"
+									else if (*pbrk[i] == '\"')	//åˆæ˜¯ç¬¬ä¸€ä¸ª"
 									{}
 								}
 
-								finding = 0;	//Ìø³öÑ­»·£¬ÅĞ¶ÏÒ»ÏÂ´ËÊ±iµÄ·¶Î§
+								finding = 0;	//è·³å‡ºå¾ªç¯ï¼Œåˆ¤æ–­ä¸€ä¸‹æ­¤æ—¶içš„èŒƒå›´
 								state = 0;
 							}
 							break;
@@ -385,21 +385,21 @@ static void get_args(uint8_t *str, uint8_t *key, _args_t *args)
 				args[0] = args_cnt - 1;
 			}
 
-			*pbrk[0] = 0;	//'('Çåµô£¬±£Ö¤º¯ÊıÃû½áÎ²Îª0
+			*pbrk[0] = 0;	//'('æ¸…æ‰ï¼Œä¿è¯å‡½æ•°åç»“å°¾ä¸º0
 		}
 		else
 		{
-			args[0] = -2;//¸ñÊ½´íÎó
+			args[0] = -2;//æ ¼å¼é”™è¯¯
 		}
 	}
 }
 
 /*
- * ´ÓCmdTblÖĞ»ñÈ¡º¯ÊıÃû
+ * ä»CmdTblä¸­è·å–å‡½æ•°å
  * @str CmdTbl[i].fname
- * @len ·µ»Øº¯ÊıÃû³¤¶È
+ * @len è¿”å›å‡½æ•°åé•¿åº¦
  *
- * return ·µ»ØÓÃ»§º¯ÊıÃûÖ¸Õë
+ * return è¿”å›ç”¨æˆ·å‡½æ•°åæŒ‡é’ˆ
  */
 static uint8_t *get_fname(uint8_t *str, uint8_t *len)
 {
@@ -408,7 +408,7 @@ static uint8_t *get_fname(uint8_t *str, uint8_t *len)
 
 	phead = (uint8_t *)strchr((char *)str, '(');
 
-	//Ìø¹ıÎ²²¿¿Õ¸ñ,\t
+	//è·³è¿‡å°¾éƒ¨ç©ºæ ¼,\t
 	phead--;
 	while (*phead == ' ' || *phead == '\t')
 	{
@@ -416,7 +416,7 @@ static uint8_t *get_fname(uint8_t *str, uint8_t *len)
 	}
 	pend = phead;
 
-	//ÕÒµ½Í·²¿µÄ ' ' »òÕß '*'
+	//æ‰¾åˆ°å¤´éƒ¨çš„ ' ' æˆ–è€… '*'
 	while (*phead != ' ' && *phead != '*' && *phead != '\t')
 	{
 		phead--;
@@ -427,33 +427,33 @@ static uint8_t *get_fname(uint8_t *str, uint8_t *len)
 	return phead;
 }
 /*
- * º¯ÊıÃüÁîĞĞÖ´ĞĞ
- * @cmd º¯ÊıÃüÁîĞĞ, eg: timer_pwm_set(0, 567)
+ * å‡½æ•°å‘½ä»¤è¡Œæ‰§è¡Œ
+ * @cmd å‡½æ•°å‘½ä»¤è¡Œ, eg: timer_pwm_set(0, 567)
  */
 void fcmd_exec(uint8_t *cmd)
 {
 	uint8_t *pcmd = cmd;
-	_args_t args[PARAMS_NUM + 1]; 	//²ÎÊıÊı×é
+	_args_t args[PARAMS_NUM + 1]; 	//å‚æ•°æ•°ç»„
 	_args_t ret = 0;
 	uint8_t i;
 	int8_t cmdtbl_param_num;
 	
-	if (*cmd == '\0')
+	if (*pcmd == '\0')
 		return ;
-	//Ìø¹ı¿ªÍ·¿Õ¸ñ
+	//è·³è¿‡å¼€å¤´ç©ºæ ¼
 	while (*pcmd == ' ')
 	{
 		pcmd++;
 	}
 
-	// ÊÇ·ñÒÑ¾­µÇÂ¼
+	// æ˜¯å¦å·²ç»ç™»å½•
 	if (s_fcmd.login_flag == 0)
 	{
 		char id_len=strlen(s_fcmd.login_id), passwd_len=strlen(s_fcmd.login_passwd);
-		if ((strlen((char*)cmd) == (id_len+passwd_len+1)) &&
-			(strncmp((char*)cmd, s_fcmd.login_id, id_len) == 0) &&
-			(cmd[id_len] == '@') &&
-			(strncmp((char*)&cmd[id_len+1], s_fcmd.login_passwd, passwd_len) == 0))
+		if ((strlen((char*)pcmd) == (id_len+passwd_len+1)) &&
+			(strncmp((char*)pcmd, s_fcmd.login_id, id_len) == 0) &&
+			(*(pcmd+id_len) == '@') &&
+			(strncmp((char*)&pcmd[id_len+1], s_fcmd.login_passwd, passwd_len) == 0))
 		{
 			s_fcmd.login_flag = 1;
 			PRINTF("Hello World!\n");
@@ -461,7 +461,7 @@ void fcmd_exec(uint8_t *cmd)
 		return ;
 	}
 
-	//·ÖÀë²ÎÊı
+	//åˆ†ç¦»å‚æ•°
 	memset(args, 0, PARAMS_NUM + 1);
 	get_args(pcmd, (uint8_t *)"(,)\"", args);
 
@@ -473,7 +473,7 @@ void fcmd_exec(uint8_t *cmd)
 
 	if (args[0] == -1)
 	{
-		//ÏµÍ³ÃüÁî
+		//ç³»ç»Ÿå‘½ä»¤
 		for (i = 0; i < CmdSysTblSize; i++)
 		{
 			if (strncmp((char *)pcmd, CmdSysTbl[i].fname, strlen((char *)pcmd)) == 0)
@@ -490,7 +490,7 @@ void fcmd_exec(uint8_t *cmd)
 	}
 	else
 	{
-		//º¯ÊıÃüÁî
+		//å‡½æ•°å‘½ä»¤
 		for (i = 0; i < CmdTblSize; i++)
 		{
 			uint8_t *pcmd_end;
@@ -498,22 +498,22 @@ void fcmd_exec(uint8_t *cmd)
 			uint8_t pcmd_len;
 			uint8_t *pfname = get_fname((uint8_t *)CmdTbl[i].fname, &pfname_len);
 
-			//malloc (int size), pcmd_endÖ¸Ïò'c'
+			//malloc (int size), pcmd_endæŒ‡å‘'c'
 			pcmd_end = pcmd + strlen((char *)pcmd) - 1;
-			while (*pcmd_end == ' ')//Ìø¹ı¿Õ¸ñ
+			while (*pcmd_end == ' ')//è·³è¿‡ç©ºæ ¼
 			{
 				--pcmd_end;
 			}
 			pcmd_len = pcmd_end - pcmd + 1;
 
-			//±È½Ïº¯ÊıÃû
+			//æ¯”è¾ƒå‡½æ•°å
 			if (strncmp((char *)pfname, (char *)pcmd, pcmd_len > pfname_len ? pcmd_len : pfname_len) == 0)
 			{
 				break;
 			}
 		}
 
-		//Ã»ÓĞÆ¥Åäµ½ÃüÁî
+		//æ²¡æœ‰åŒ¹é…åˆ°å‘½ä»¤
 		if (i >= CmdTblSize)
 		{
 			PRINTF("err:no such cmd\n");
@@ -521,14 +521,14 @@ void fcmd_exec(uint8_t *cmd)
 		}
 	}
 
-	//µÃµ½º¯Êı±íÀïµÄº¯ÊıµÄ²ÎÊı¸öÊı
+	//å¾—åˆ°å‡½æ•°è¡¨é‡Œçš„å‡½æ•°çš„å‚æ•°ä¸ªæ•°
 	if (args[0] != -1)
 	{
-		//º¯ÊıÃüÁî
+		//å‡½æ•°å‘½ä»¤
 		cmdtbl_param_num = get_args_num((uint8_t *)CmdTbl[i].fname, (uint8_t *)"(,)");
 		if (cmdtbl_param_num == -2)
 		{
-			;//¿É±ä²ÎÊıÇé¿ö
+			;//å¯å˜å‚æ•°æƒ…å†µ
 		}
 		else if (cmdtbl_param_num != args[0])
 		{
@@ -538,12 +538,12 @@ void fcmd_exec(uint8_t *cmd)
 	}
 	else
 	{
-		//Ö´ĞĞÏµÍ³ÃüÁî
+		//æ‰§è¡Œç³»ç»Ÿå‘½ä»¤
 		(*(_args_t(*)())CmdSysTbl[i].pfunc)();
 		return;
 	}
 
-	//Ö´ĞĞº¯ÊıÃüÁî
+	//æ‰§è¡Œå‡½æ•°å‘½ä»¤
 	switch (args[0])
 	{
 	case 0:

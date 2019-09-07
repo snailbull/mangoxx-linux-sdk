@@ -1,7 +1,7 @@
 #ifndef _FCMD_CFG_H_
 #define _FCMD_CFG_H_
 /*******************************************************************************
-* ÓÃ»§º¯ÊıÃüÁîÍ·ÎÄ¼ş°üº¬£¬º¯ÊıÉùÃ÷
+* ç”¨æˆ·å‡½æ•°å‘½ä»¤å¤´æ–‡ä»¶åŒ…å«ï¼Œå‡½æ•°å£°æ˜
 */
 
 #include "cmd_mem.h"
@@ -11,7 +11,7 @@ int get_test(char *server, int port, char *url);
 int sslget_test(char *server, uint16_t port, char *url);
 
 /**
- * ÏµÍ³ÃüÁî±í
+ * ç³»ç»Ÿå‘½ä»¤è¡¨
  */
 CmdTbl_t CmdSysTbl[] =
 {
@@ -20,7 +20,7 @@ CmdTbl_t CmdSysTbl[] =
 	{"q", (void(*)(void))sys_q},
 };
 /**
- * º¯ÊıÃüÁî±í
+ * å‡½æ•°å‘½ä»¤è¡¨
  */
 CmdTbl_t CmdTbl[] =
 {

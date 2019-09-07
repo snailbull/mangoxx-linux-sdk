@@ -3,11 +3,11 @@
 #include "cmd_mem.h"
 
 /*
- * ÏÔÊ¾ÄÚ´æÄÚÈİ
- * buff:ĞèÒªdumpµÄÄÚ´æ
- * addr:±»dumpµÄÄÚ´æµØÖ·
- * elem_cnt:±»dump¶àÉÙ¸öÔªËØ
- * elem_size:Ò»¸öÔªËØÓĞ¼¸¸ö×Ö½Ú¿í
+ * æ˜¾ç¤ºå†…å­˜å†…å®¹
+ * buff:éœ€è¦dumpçš„å†…å­˜
+ * addr:è¢«dumpçš„å†…å­˜åœ°å€
+ * elem_cnt:è¢«dumpå¤šå°‘ä¸ªå…ƒç´ 
+ * elem_size:ä¸€ä¸ªå…ƒç´ æœ‰å‡ ä¸ªå­—èŠ‚å®½
  */
 void md(int addr, int elem_cnt, int elem_size)
 {
@@ -17,9 +17,9 @@ void md(int addr, int elem_cnt, int elem_size)
 	const uint16_t *sp;
 	const uint32_t *lp;
 
-	int line_elem;//Ò»ĞĞ¶àÉÙ¸öÔªËØ
-	int line_count;//ÓĞ¶àÉÙĞĞ
-	int line_remain;//×îºóÒ»ĞĞÊ£ÏÂ¶àÉÙ¸öÔªËØ
+	int line_elem;//ä¸€è¡Œå¤šå°‘ä¸ªå…ƒç´ 
+	int line_count;//æœ‰å¤šå°‘è¡Œ
+	int line_remain;//æœ€åä¸€è¡Œå‰©ä¸‹å¤šå°‘ä¸ªå…ƒç´ 
 
 	if ((elem_size == 1) || (elem_size == 2) || (elem_size == 4))
 		;
@@ -29,7 +29,7 @@ void md(int addr, int elem_cnt, int elem_size)
 	}
 
 	line_elem = 16 / elem_size;
-	line_count = (elem_cnt + line_elem - 1) / line_elem;//ÏòÉÏÈ¡Õû£¬²»¹»Ò»ĞĞËãÒ»ĞĞ
+	line_count = (elem_cnt + line_elem - 1) / line_elem;//å‘ä¸Šå–æ•´ï¼Œä¸å¤Ÿä¸€è¡Œç®—ä¸€è¡Œ
 	line_remain = elem_cnt % line_elem;
 
 	PUTC('\n');
@@ -88,11 +88,11 @@ void md(int addr, int elem_cnt, int elem_size)
 }
 
 /*
- * ±È½ÏÁ©¿éÄÚ´æÊÇ·ñÏàµÈ
- * mem1:µÚÒ»¿éÄÚ´æµØÖ·
- * mem2:µÚ¶ş¿é
- * elem_cnt:±È½Ï¶àÉÙ¸öÔªËØ
- * elem_size:Ò»¸öÔªËØÊÇ¼¸¸ö×Ö½Ú
+ * æ¯”è¾ƒä¿©å—å†…å­˜æ˜¯å¦ç›¸ç­‰
+ * mem1:ç¬¬ä¸€å—å†…å­˜åœ°å€
+ * mem2:ç¬¬äºŒå—
+ * elem_cnt:æ¯”è¾ƒå¤šå°‘ä¸ªå…ƒç´ 
+ * elem_size:ä¸€ä¸ªå…ƒç´ æ˜¯å‡ ä¸ªå­—èŠ‚
  */
 int cmp(void *mem1, void *mem2, int elem_cnt, int elem_size)
 {
