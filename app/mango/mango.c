@@ -46,9 +46,10 @@ mangoHttpClient_t* mango_connect(char* serverIP, uint16_t serverPort){
     return hc;
 }
 
-mangoHttpClient_t *mango_sslconnect(char* serverIP, uint16_t serverPort, ssl_ca_crt_key_t *ssl_cck, const SSL_METHOD *method, int verify_mode, int frag_len)
+mangoHttpClient_t *mango_sslconnect(char* serverIP, uint16_t serverPort, ssl_ca_crt_key_t *ssl_cck, ssl_ca_crt_key_file_t *ssl_cck_file, const SSL_METHOD *method, int verify_mode, int frag_len)
 {
     mangoHttpClient_t *hc;
+	int ret=0;
     
     MANGO_ENSURE(serverIP, ("?") );
     
@@ -62,29 +63,50 @@ mangoHttpClient_t *mango_sslconnect(char* serverIP, uint16_t serverPort, ssl_ca_
 	// ssl ctx
 	if ((hc->ctx = SSL_CTX_new(method)) == NULL)
 		goto failed;
-	if (ssl_cck->cacrt)
+	if (ssl_cck)
 	{
-		X509 *cacrt = d2i_X509(NULL, (const unsigned char **)&ssl_cck->cacrt, ssl_cck->cacrt_len);
-		if (cacrt == NULL)
-			goto failed1;
-		SSL_CTX_add_client_CA(hc->ctx, cacrt);
+		if (ssl_cck->cacrt)
+		{
+			X509 *cacrt = d2i_X509(NULL, (const unsigned char **)&ssl_cck->cacrt, ssl_cck->cacrt_len);
+			if (cacrt == NULL)
+				goto failed1;
+			SSL_CTX_add_client_CA(hc->ctx, cacrt);
+		}
+		if (ssl_cck->cert && ssl_cck->key)
+		{
+			if (0 == SSL_CTX_use_certificate_ASN1(hc->ctx, ssl_cck->cert_len, ssl_cck->cert))
+				goto failed1;
+			if (0 == SSL_CTX_use_PrivateKey_ASN1(0, hc->ctx, ssl_cck->key, ssl_cck->key_len))
+				goto failed1;
+		}
+		if (ssl_cck->cacrt)
+		{
+			SSL_CTX_set_verify(hc->ctx, verify_mode, NULL);
+		}
+		else
+		{
+			SSL_CTX_set_verify(hc->ctx, SSL_VERIFY_NONE, NULL);
+		}
 	}
-	if (ssl_cck->cert && ssl_cck->key)
+	else if (ssl_cck_file)
 	{
-		if (0 == SSL_CTX_use_certificate_ASN1(hc->ctx, ssl_cck->cert_len, ssl_cck->cert))
-			goto failed1;
-		if (0 == SSL_CTX_use_PrivateKey_ASN1(0, hc->ctx, ssl_cck->key, ssl_cck->key_len))
-			goto failed1;
-	}
-	if (ssl_cck->cacrt)
-	{
-		SSL_CTX_set_verify(hc->ctx, verify_mode, NULL);
+		if (ssl_cck_file->cafile && ssl_cck_file->capath)
+		{
+			SSL_CTX_load_verify_locations(hc->ctx, ssl_cck_file->cafile, ssl_cck_file->capath);
+		}
+		if (ssl_cck_file->certfile)
+		{
+			SSL_CTX_use_certificate_file(hc->ctx, ssl_cck_file->certfile, SSL_FILETYPE_PEM);
+		}
+		if (ssl_cck_file->keyfile)
+		{
+			SSL_CTX_use_PrivateKey_file(hc->ctx, ssl_cck_file->keyfile, SSL_FILETYPE_PEM);
+		}
 	}
 	else
 	{
-		SSL_CTX_set_verify(hc->ctx, SSL_VERIFY_NONE, NULL);
+		SSL_CTX_set_verify(hc->ctx, verify_mode, NULL);
 	}
-	SSL_CTX_set_default_read_buffer_len(hc->ctx, frag_len);
 
 	// socket
 	hc->socketfd = mangoPort_connect(serverIP, serverPort, MANGO_SOCKET_CONNECT_TIMEOUT_MS);
@@ -95,19 +117,23 @@ mangoHttpClient_t *mango_sslconnect(char* serverIP, uint16_t serverPort, ssl_ca_
 	if ((hc->ssl = SSL_new(hc->ctx)) == NULL)
 		goto failed2;
 	SSL_set_fd(hc->ssl, hc->socketfd);
-	if (-1 == SSL_connect(hc->ssl))
+	if (SSL_connect(hc->ssl) != 1)
 		goto failed3;
 
     mangoSM_INIT(hc);
     return hc;
 
 failed3:
+	MANGO_DBG(MANGO_DBG_LEVEL_PORT,("failed3:SSL_free(hc->ssl)\n"));
 	SSL_free(hc->ssl);
 failed2:
+	MANGO_DBG(MANGO_DBG_LEVEL_PORT,("failed2:close(hc->socketfd)\n"));
 	close(hc->socketfd);
 failed1:
+	MANGO_DBG(MANGO_DBG_LEVEL_PORT,("failed1:SSL_CTX_free(hc->ctx)\n"));
 	SSL_CTX_free(hc->ctx);
 failed:
+	MANGO_DBG(MANGO_DBG_LEVEL_PORT,("failed:mangoPort_free(hc)\n"));
 	mangoPort_free(hc);
 	return NULL;
 }

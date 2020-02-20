@@ -27,6 +27,11 @@
 #include <stdint.h>         /* uint32_t, ... */
 #include <stddef.h>
 #include <openssl/ssl.h>
+#include <openssl/evp.h>
+#include <openssl/x509.h>
+#include <openssl/ssl.h>
+#include <openssl/pem.h>
+#include <openssl/err.h>
 
 #include "mangoConfig.h"
 

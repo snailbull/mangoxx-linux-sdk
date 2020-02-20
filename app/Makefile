@@ -15,18 +15,13 @@
 FLAVOR = debug
 
 ifndef PDIR # {
-GEN_IMAGES= app.out
+#GEN_IMAGES= app.out
 #GEN_BINS= app.bin
-#SPECIAL_MKTARGETS=
-SUBDIRS=    \
-	mango_test	\
-	fcmd	\
-	mango	\
-	user
-
+GEN_TARGETS= app.elf
+SUBDIRS ?= $(patsubst %/,%,$(dir $(wildcard */Makefile)))
 endif # } PDIR
 
-CCFLAGS += -Ofast
+CCFLAGS += -Ofast -Wno-pointer-to-int-cast
 
 TARGET_LDFLAGS =
 
@@ -38,8 +33,11 @@ COMPONENTS_app = \
 
 LINKFLAGS_app := \
 	-L$(PDIR)lib	\
+	-Wl,-E			\
 	-lssl			\
 	-lcrypto		\
+	-lreadline		\
+	-lncursesw		\
 	-lpthread
 
 #DEPENDS_app := $(LD_FILE)
@@ -64,10 +62,6 @@ DEFINES +=				\
 	$(UNIVERSAL_TARGET_DEFINES)	\
 	$(CONFIGURATION_DEFINES)
 
-DDEFINES +=				\
-	$(UNIVERSAL_TARGET_DEFINES)	\
-	$(CONFIGURATION_DEFINES)
-
 
 #############################################################
 # Recursion Magic - Don't touch this!!
@@ -80,8 +74,9 @@ DDEFINES +=				\
 #
 # Required for each makefile to inherit from the parent
 #
-INCLUDES := $(INCLUDES) -I $(PDIR)include
-
+INCLUDES += -I $(PDIR)include
+INCLUDES += -I $(PDIR)app/mango
+INCLUDES += -I $(PDIR)app/user
 
 ifndef PDIR
 PDIR := $(CURDIR)/../

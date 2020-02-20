@@ -58,6 +58,9 @@
     #define RESOURCE_URL        "/" 
 #endif
 
+char s_server_ip[64];
+uint16_t s_server_port;
+char s_url[64];
 
 
 static mangoErr_t mangoApp_handler(mangoArg_t* mangoArgs, void* userArgs)
@@ -173,7 +176,7 @@ static mangoErr_t httpGet(mangoHttpClient_t* httpClient)
     /*
     * Select if a GET or HEAD request will be sent
     */
-    err = mango_httpRequestNew(httpClient, RESOURCE_URL,  MANGO_HTTP_METHOD_GET);
+    err = mango_httpRequestNew(httpClient, s_url,  MANGO_HTTP_METHOD_GET);
     //err = mango_httpRequestNew(httpClient, RESOURCE_URL,  MANGO_HTTP_METHOD_HEAD);
     if(err != MANGO_OK){ return MANGO_ERR; }
     
@@ -187,7 +190,7 @@ static mangoErr_t httpGet(mangoHttpClient_t* httpClient)
     * The "host: xxxx" header is required by almost all servers so we need
     * to add it.
     */
-    err = mango_httpHeaderSet(httpClient, MANGO_HDR__HOST, SERVER_HOSTNAME);
+    err = mango_httpHeaderSet(httpClient, MANGO_HDR__HOST, s_server_ip);
     if(err != MANGO_OK){ return MANGO_ERR; }
     
     /*
@@ -212,21 +215,22 @@ static mangoErr_t httpGet(mangoHttpClient_t* httpClient)
         */
     }
     
-    
     return MANGO_ERR;
 }
 
-
-
-int get_test(void)
+int get_test(char *server, uint16_t port, char *url)
 {
     mangoHttpClient_t* httpClient;
     mangoErr_t err;
     
+    strcpy(s_server_ip, server);
+    s_server_port = port;
+    strcpy(s_url, url);
+
     /*
     * Connect to server
     */
-    httpClient = mango_connect(SERVER_IP, SERVER_PORT);
+    httpClient = mango_connect(s_server_ip, s_server_port);
     if(!httpClient){
         PRINTF("mangoHttpClient_connect() FAILED!");
         return MANGO_ERR;
@@ -252,7 +256,7 @@ int get_test(void)
     else {
         /*
         * Fatal error during the GET request (working buffer was small or connection was closed). 
-        * At this point mango_disconnect() should be called. 
+        * At this point mango_disconnect() should be called.
         */
         PRINTF("HTTP request failed!\r\n");
     }
@@ -261,6 +265,62 @@ int get_test(void)
     * Disconnect from server
     */
     mango_disconnect(httpClient);
+    
+    return 0;
+}
+
+int sslget_test(char *server, uint16_t port, char *url)
+{
+    mangoHttpClient_t* httpClient;
+    mangoErr_t err;
+    
+    strcpy(s_server_ip, server);
+    s_server_port = port;
+    strcpy(s_url, url);
+
+	SSL_library_init();
+
+	ssl_ca_crt_key_file_t cck_file={
+		"./mango_test/cert/owin.cer", "./mango_test/cert/",
+		// "./mango_test/cert/client.crt",
+		// "./mango_test/cert/client.key"
+	};
+	httpClient = mango_sslconnect(s_server_ip, s_server_port, NULL, &cck_file, SSLv23_client_method(), SSL_VERIFY_CLIENT_ONCE, 2048);
+	if (!httpClient)
+	{
+		printf("mangoHttpClient_connect() FAILED!");
+		return MANGO_ERR;
+	}
+    
+    /*
+    * Do the HTTP GET 
+    */
+    err = httpGet(httpClient);
+    if(err >= MANGO_ERR_HTTP_100 && err <= MANGO_ERR_HTTP_599){ 
+        /*
+        * HTTP request recognized by the server, err stores the 
+        * final HTTP response status code. It may be a 200 or
+        * any other status code. 
+        *
+        * NOTE: At this point the status of the HTTP session is healthy
+        * and we can continue sending other HTTP request without
+        * closing the HTTP connection. It is possible to call httpGet()
+        * again or to continue with new POST/PUT/GET/HEAD requests.
+        */
+        PRINTF("HTTP response code was %d\r\n", err);
+    }
+    else {
+        /*
+        * Fatal error during the GET request (working buffer was small or connection was closed). 
+        * At this point mango_disconnect() should be called.
+        */
+        PRINTF("HTTP request failed!\r\n");
+    }
+    
+    /*
+    * Disconnect from server
+    */
+    mango_ssldisconnect(httpClient);
     
     return 0;
 }

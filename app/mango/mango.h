@@ -52,6 +52,14 @@ typedef struct ssl_ca_crt_key
     unsigned int key_len;
 } ssl_ca_crt_key_t;
 
+typedef struct ssl_ca_crt_key_file
+{
+	char *cafile;
+	char *capath;
+	char *certfile;
+	char *keyfile;
+} ssl_ca_crt_key_file_t;
+
 ssl_ca_crt_key_t *sslcert_load(char *cacrt, char *cert, char *key);
 void sslcert_free(ssl_ca_crt_key_t *s);
 
@@ -61,7 +69,7 @@ void sslcert_free(ssl_ca_crt_key_t *s);
  * @retval NULL         If the conenction failed to be established
  */
 mangoHttpClient_t*  mango_connect(char* serverIP, uint16_t serverPort);
-mangoHttpClient_t *mango_sslconnect(char* serverIP, uint16_t serverPort, ssl_ca_crt_key_t *ssl_cck, const SSL_METHOD *method, int verify_mode, int frag_len);
+mangoHttpClient_t *mango_sslconnect(char* serverIP, uint16_t serverPort, ssl_ca_crt_key_t *ssl_cck, ssl_ca_crt_key_file_t *ssl_cck_file, const SSL_METHOD *method, int verify_mode, int frag_len);
 
 /**
  * @brief  Creates an new HTTP request

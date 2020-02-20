@@ -122,50 +122,40 @@ void mangoPort_free(void* ptr){
 int mangoPort_read(int socketfd, uint8_t* data, uint16_t datalen, uint32_t timeout){
     uint32_t received;
     uint32_t start;
-    int socketerror;
     int retval;
-	
+    struct timeval t;
+    fd_set fdset;
+
     MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("Trying to read %u bytes\r\n", datalen) );
-    
     received = 0;
     start = mangoPort_timeNow();
-	while(received < datalen){
-    
-        retval = recv(socketfd, &data[received], datalen - received, 0);
-        //printf("READ %d\r\n", retval);
-        if(retval < 0){
-            //socketerrorlen = sizeof(socketerror);
-            //retval = getsockopt(socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
-#ifdef MANGO_IP_ENV__UNIX
-            socketerror = errno;
-#endif
-            
-#ifdef MANGO_IP_ENV__LWIP
-            socklen_t socketerrorlen;
-            socketerrorlen = sizeof(socketerror);
-            retval = getsockopt(socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
-#endif
-            
-            MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("!!!!!!! READ SOCKET ERROR %d\r\n", socketerror) );
-            
-            if(socketerror == EWOULDBLOCK || socketerror == EAGAIN){
-                mangoPort_sleep(64);
-            }else{
-                return -1;
-            }
-        }else{
-            received += retval;
-            return received;
-        }
-        
-        if(mangoHelper_elapsedTime(start) > timeout){
-            return received;
-        }
+
+    FD_ZERO(&fdset);
+    FD_SET(socketfd, &fdset);
+    t.tv_sec = 0;
+    t.tv_usec = timeout * 1000;
+
+	if (select(socketfd+1, &fdset, NULL, NULL, &t) > 0)
+	{
+		if (FD_ISSET(socketfd, &fdset))
+		{
+			do {
+				retval = recv(socketfd, &data[received], datalen - received, 0);
+				if (retval > 0)
+				{
+					received += retval;
+				}
+				else if (retval < 0)
+				{
+					received = retval;
+					break;
+				}
+			} while((received < datalen) && (mangoHelper_elapsedTime(start) < timeout));
+		}
 	}
-	
-	MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("%u bytes read\r\n", retval) );
-	
-	return retval;
+	MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("%u bytes read\r\n", received) );
+
+	return received;
 }
 
 
@@ -187,42 +177,40 @@ int mangoPort_write(int socketfd, uint8_t* data, uint16_t datalen, uint32_t time
     uint32_t start;
     int socketerror;
     int retval;
-    
+    struct timeval t;
+    fd_set fdset;
+    int readysock;
+
 	MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("Trying to write %u bytes\r\n", datalen) );
 	
+    FD_ZERO(&fdset);
+    FD_SET(socketfd, &fdset);
+    t.tv_sec = 0;
+    t.tv_usec = timeout * 1000;
+
     sent = 0;
     start = mangoPort_timeNow();
-    while(sent < datalen){
-        retval = write(socketfd, &data[sent], datalen - sent);
-        if(retval < 0){
-            //socketerrorlen = sizeof(socketerror);
-            //retval = getsockopt(socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
-#ifdef MANGO_IP_ENV__UNIX
-            socketerror = errno;
-#endif
-            
-#ifdef MANGO_IP_ENV__LWIP
-            socklen_t socketerrorlen;
-            socketerrorlen = sizeof(socketerror);
-            retval = getsockopt(socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
-#endif
-            
-            MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("!!!!!!! WRITE SOCKET ERROR %d\r\n", socketerror) );
-            
-            if(socketerror == EWOULDBLOCK || socketerror == EAGAIN){
-                mangoPort_sleep(64);
-            }else{
-                return -1;
+
+    do {
+        readysock = select(socketfd+1, NULL, &fdset, NULL, &t);
+    }while(readysock <= 0);
+
+    if (FD_ISSET(socketfd, &fdset))
+    {
+        do {
+            retval = send(socketfd, &data[sent], datalen - sent, 0);
+            if (retval > 0)
+            {
+                sent += retval;
             }
-        }else{
-            sent += retval;
-        }
-        
-        if(mangoHelper_elapsedTime(start) > timeout){
-            return sent;
-        }
-    };
-    
+            else if (retval < 0)
+            {
+                sent = retval;
+                break;
+            }
+        }while((sent < datalen) && (mangoHelper_elapsedTime(start) < timeout));
+    }
+
     return sent;
 }
 
@@ -246,23 +234,28 @@ int mangoPort_connect(char* serverIP, uint16_t serverPort, uint32_t timeout){
     int retval;
     struct sockaddr_in s_addr_in;
     int socketfd;
+	struct hostent *h;
     
+	h = gethostbyname(serverIP);
+	if (h == NULL)
+	{
+		return -1;
+	}
+
     socketfd = socket(AF_INET, SOCK_STREAM, 0);
     
     memset(&s_addr_in, 0, sizeof(s_addr_in));
-    s_addr_in.sin_family      = AF_INET;
-    s_addr_in.sin_port        = htons (serverPort);
-    s_addr_in.sin_addr.s_addr = inet_addr(serverIP);
+    s_addr_in.sin_family = AF_INET;
+    s_addr_in.sin_port   = htons (serverPort);
+    s_addr_in.sin_addr   = *(struct in_addr*)(h->h_addr_list[0]);//inet_addr(serverIP);
 
     retval = connect(socketfd, (struct sockaddr *) &s_addr_in, sizeof(s_addr_in));
-
     if(retval == 0){
-        retval = fcntl(socketfd, F_SETFL, O_NONBLOCK);
-        if(retval == 0){
-            
-        }
-        
-        return socketfd;
+		// O_NONBLOCK socket cause ssl handshake failed.
+        // retval = fcntl(socketfd, F_SETFL, O_NONBLOCK);
+        // if(retval == 0){   
+        // }
+		return socketfd;
     }else{
         close(socketfd);
         return -1;
@@ -275,49 +268,40 @@ int mangoPort_connect(char* serverIP, uint16_t serverPort, uint32_t timeout){
 int mangoPort_sslread(mangoHttpClient_t *hc, uint8_t* data, uint16_t datalen, uint32_t timeout){
     uint32_t received;
     uint32_t start;
-    int socketerror;
     int retval;
-	
+    struct timeval t;
+    fd_set fdset;
+
     MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("Trying to read %u bytes\r\n", datalen) );
-    
     received = 0;
     start = mangoPort_timeNow();
-	while(received < datalen){
-        retval = SSL_read(hc->ssl, &data[received], datalen - received);
-        //printf("READ %d\r\n", retval);
-        if(retval < 0){
-            //socketerrorlen = sizeof(socketerror);
-            //retval = getsockopt(socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
-#ifdef MANGO_IP_ENV__UNIX
-            socketerror = errno;
-#endif
-            
-#ifdef MANGO_IP_ENV__LWIP
-            socklen_t socketerrorlen;
-            socketerrorlen = sizeof(socketerror);
-            retval = getsockopt(hc->socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
-#endif
-            
-            MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("!!!!!!! READ SOCKET ERROR %d\r\n", socketerror) );
-            
-            if(socketerror == EWOULDBLOCK || socketerror == EAGAIN){
-                mangoPort_sleep(64);
-            }else{
-                return -1;
-            }
-        }else{
-            received += retval;
-            return received;
-        }
-        
-        if(mangoHelper_elapsedTime(start) > timeout){
-            return received;
-        }
+
+    FD_ZERO(&fdset);
+    FD_SET(hc->socketfd, &fdset);
+    t.tv_sec = 0;
+    t.tv_usec = timeout * 1000;
+
+	if (select(hc->socketfd+1, &fdset, NULL, NULL, &t) > 0)
+	{
+		if (FD_ISSET(hc->socketfd, &fdset))
+		{
+			do {
+                retval = SSL_read(hc->ssl, &data[received], datalen - received);
+				if (retval > 0)
+				{
+					received += retval;
+				}
+				else if (retval < 0)
+				{
+					received = retval;
+					break;
+				}
+			} while((received < datalen) && (mangoHelper_elapsedTime(start) < timeout));
+		}
 	}
-	
-	MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("%u bytes read\r\n", retval) );
-	
-	return retval;
+	MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("%u bytes read\r\n", received) );
+
+	return received;
 }
 
 int mangoPort_sslwrite(mangoHttpClient_t *hc, uint8_t* data, uint16_t datalen, uint32_t timeout){
@@ -325,42 +309,39 @@ int mangoPort_sslwrite(mangoHttpClient_t *hc, uint8_t* data, uint16_t datalen, u
     uint32_t start;
     int socketerror;
     int retval;
-    
+    struct timeval t;
+    fd_set fdset;
+    int readysock;
+
 	MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("Trying to write %u bytes\r\n", datalen) );
 	
+    FD_ZERO(&fdset);
+    FD_SET(hc->socketfd, &fdset);
+    t.tv_sec = 0;
+    t.tv_usec = timeout * 1000;
+
     sent = 0;
     start = mangoPort_timeNow();
-    while(sent < datalen){
-        retval = SSL_write(hc->ssl, &data[sent], datalen - sent);
-        if(retval < 0){
-            //socketerrorlen = sizeof(socketerror);
-            //retval = getsockopt(socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
-#ifdef MANGO_IP_ENV__UNIX
-            socketerror = errno;
-#endif
-            
-#ifdef MANGO_IP_ENV__LWIP
-            socklen_t socketerrorlen;
-            socketerrorlen = sizeof(socketerror);
-            retval = getsockopt(hc->socketfd, SOL_SOCKET, SO_ERROR, &socketerror, (socklen_t *) &socketerrorlen);
-#endif
-            
-            MANGO_DBG(MANGO_DBG_LEVEL_PORT, ("!!!!!!! WRITE SOCKET ERROR %d\r\n", socketerror) );
-            
-            if(socketerror == EWOULDBLOCK || socketerror == EAGAIN){
-                mangoPort_sleep(64);
-            }else{
-                return -1;
+
+    do {
+        readysock = select(hc->socketfd+1, NULL, &fdset, NULL, &t);
+    }while(readysock <= 0);
+
+    if (FD_ISSET(hc->socketfd, &fdset))
+    {
+        do {
+            retval = SSL_write(hc->ssl, &data[sent], datalen - sent);
+            if (retval > 0)
+            {
+                sent += retval;
             }
-        }else{
-            sent += retval;
-        }
-        
-        if(mangoHelper_elapsedTime(start) > timeout){
-            return sent;
-        }
-    };
-    
+            else if (retval < 0)
+            {
+                sent = retval;
+                break;
+            }
+        }while((sent < datalen) && (mangoHelper_elapsedTime(start) < timeout));
+    }
     return sent;
 }
 
@@ -459,6 +440,10 @@ failed:
 
 void sslcert_free(ssl_ca_crt_key_t *s)
 {
+	if (s == NULL)
+	{
+		return ;
+	}
 	if (s->cacrt)
 	{
 		free((void*)(s->cacrt));
