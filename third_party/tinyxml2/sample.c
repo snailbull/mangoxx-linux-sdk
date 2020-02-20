@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include "../tinyxml/tinyxml.h"
- 
+#include "tinyxml2.h"
+
 int main()
 {
 	// 解析xml

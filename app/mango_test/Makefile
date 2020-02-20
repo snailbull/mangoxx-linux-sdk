@@ -38,8 +38,6 @@ endif
 #
 INCLUDES += -I $(PDIR)include
 
-INCLUDES += -I ../mango/
-
 ifndef PDIR
 PDIR := $(CURDIR)/../
 else
