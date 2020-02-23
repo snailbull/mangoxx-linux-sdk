@@ -1,215 +1,123 @@
-# common linux makefile
-# 2018-9-4
+#
+# Rules for root path
+#
+# ld -verbose    系统默认的连接脚本
+#
+# ldconfig -p | grep libcrypto   查找库文件路径
+#  $^=all depend files   $@=target   $<=first depend files
 #
 
 CROSS_COMPILE = 
 AR = $(CROSS_COMPILE)ar
 CC = $(CROSS_COMPILE)gcc
 NM = $(CROSS_COMPILE)nm
-CPP = $(CROSS_COMPILE)g++
+CXX = $(CROSS_COMPILE)g++
 OBJCOPY = $(CROSS_COMPILE)objcopy
 OBJDUMP = $(CROSS_COMPILE)objdump
 
-LD_FILE := $(PDIR)ld/app.ld
-BIN_FILE := $(PDIR)bin/app.bin
+LD_FILE := $(ROOT_PATH)/ld/app.ld
 
-CSRCS ?= $(wildcard *.c)
-CPPSRCS ?= $(wildcard *.cpp)
-ASRCs ?= $(wildcard *.s)
-ASRCS ?= $(wildcard *.S)
 SUBDIRS ?= $(patsubst %/,%,$(dir $(wildcard */Makefile)))
 
-ODIR := .output
-OBJODIR := $(ODIR)/$(FLAVOR)/obj
+CFLAGS += -Ofast -g -Wpointer-arith -Wundef
 
-OBJS := $(CSRCS:%.c=$(OBJODIR)/%.o) \
-        $(CPPSRCS:%.cpp=$(OBJODIR)/%.o) \
-        $(ASRCs:%.s=$(OBJODIR)/%.o) \
-        $(ASRCS:%.S=$(OBJODIR)/%.o)
+INCLUDES += -I $(ROOT_PATH)/components
 
-DEPS := $(CSRCS:%.c=$(OBJODIR)/%.d) \
-        $(CPPSRCS:%.cpp=$(OBJODIR)/%.d) \
-        $(ASRCs:%.s=$(OBJODIR)/%.d) \
-        $(ASRCS:%.S=$(OBJODIR)/%.d)
-
-LIBODIR := $(ODIR)/$(FLAVOR)/lib
-OLIBS := $(GEN_LIBS:%=$(LIBODIR)/%)
-
-IMAGEODIR := $(ODIR)/$(FLAVOR)/image
-OIMAGES := $(GEN_IMAGES:%=$(IMAGEODIR)/%)
-
-BINODIR := $(ODIR)/$(FLAVOR)/bin
-OBINS := $(GEN_BINS:%=$(BINODIR)/%)
-
-GEN_BUILTS := $(foreach f,$(SUBDIRS),$(f)/$(ODIR)/$(FLAVOR)/built-in.o)
-
-CCFLAGS += 	\
-	-g				\
-	-Wpointer-arith	\
-	-Wundef			\
-#	-Wall
-
-CFLAGS = $(CCFLAGS) $(DEFINES) $(EXTRA_CCFLAGS) $(INCLUDES)
+CFLAGS += $(INCLUDES) $(EXTRA_CFLAGS)
+LDFLAGS += -L$(ROOT_PATH)/lib $(LD_FLAGS) -Wl,--as-needed
 
 
 #############################################################
-# Functions
+# Top targets
 #
-
-define ShortcutRule
-$(1): .subdirs $(2)/$(1)
-endef
-
-define MakeLibrary
-DEP_LIBS_$(1) = $$(foreach lib,$$(filter %.a,$$(COMPONENTS_$(1))),$$(dir $$(lib))$$(LIBODIR)/$$(notdir $$(lib)))
-DEP_OBJS_$(1) = $$(foreach obj,$$(filter %.o,$$(COMPONENTS_$(1))),$$(dir $$(obj))$$(OBJODIR)/$$(notdir $$(obj)))
-$$(LIBODIR)/$(1).a: $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1)) $$(DEPENDS_$(1))
-	@mkdir -p $$(LIBODIR)
-	@$$(if $$(filter %.a,$$?),mkdir -p $$(EXTRACT_DIR)_$(1))
-	@$$(if $$(filter %.a,$$?),cd $$(EXTRACT_DIR)_$(1); $$(foreach lib,$$(filter %.a,$$?),$$(AR) xo $$(UP_EXTRACT_DIR)/$$(lib);))
-	@echo AR $(1).a
-	@$$(AR) ru $$@ $$(filter %.o,$$?) $$(if $$(filter %.a,$$?),$$(EXTRACT_DIR)_$(1)/*.o)
-	@echo LD built-in.o
-	$$(LD) -r -o $$(LIBODIR)/../built-in.o $$(OBJS) $$(foreach f,$$(SUBDIRS),$$(f)/$$(ODIR)/$$(FLAVOR)/built-in.o)
-	@$$(if $$(filter %.a,$$?),$$(RM) -r $$(EXTRACT_DIR)_$(1))
-endef
-
-define MakeImage
-DEP_LIBS_$(1) = $$(foreach lib,$$(filter %.a,$$(COMPONENTS_$(1))),$$(dir $$(lib))$$(LIBODIR)/$$(notdir $$(lib)))
-DEP_OBJS_$(1) = $$(foreach obj,$$(filter %.o,$$(COMPONENTS_$(1))),$$(dir $$(obj))$$(OBJODIR)/$$(notdir $$(obj)))
-$$(IMAGEODIR)/$(1).out: $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1)) $$(DEPENDS_$(1))
-	@mkdir -p $$(IMAGEODIR)
-	@echo LD $$@
-	@$$(CC) $$(LDFLAGS) $$(if $$(LINKFLAGS_$(1)),$$(LINKFLAGS_$(1)),$$(LINKFLAGS_DEFAULT) $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1))) -o $$@ $$(GEN_BUILTS)
-endef
-
-define MakeTarget
-DEP_LIBS_$(1) = $$(foreach lib,$$(filter %.a,$$(COMPONENTS_$(1))),$$(dir $$(lib))$$(LIBODIR)/$$(notdir $$(lib)))
-DEP_OBJS_$(1) = $$(foreach obj,$$(filter %.o,$$(COMPONENTS_$(1))),$$(dir $$(obj))$$(OBJODIR)/$$(notdir $$(obj)))
-$(1).elf: $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1)) $$(DEPENDS_$(1))
-	@echo CC $$@
-	$$(CC) $$(LDFLAGS) $$(if $$(LINKFLAGS_$(1)),$$(LINKFLAGS_$(1)),$$(LINKFLAGS_DEFAULT) $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1))) $$(GEN_BUILTS) -o $$@
-endef
-
-#############################################################
-# Rules base
-# Should be done in top-level makefile only
-#
-.PHONY: all clean distclean
-all:	.subdirs $(OBJS) $(OLIBS) $(OIMAGES) $(OBINS) $(GEN_TARGETS)
+.PHONY: all clean install debug
+all: .subdirs $(OBJS) $(LIBS) $(TARGETS)
 
 clean:
-	@$(foreach d, $(SUBDIRS), $(MAKE) -C $(d) clean;)
-	$(RM) -r $(ODIR)/$(FLAVOR)
+	$(foreach d,$(SUBDIRS),$(MAKE) -C $(d) clean;)
+	$(if $(SUBDIRS),, find ./ -name "*.[od]" | xargs rm -f;rm -f $(LIBS);)
 
-distclean:
-	@$(foreach d, $(SUBDIRS), $(MAKE) -C $(d) distclean;)
-	$(RM) -r $(ODIR)
+install: 
+	$(foreach d, $(SUBDIR), $(MAKE) -C $(d) install;)
+	$(if $(SUBDIRS),, cp -t $(ROOT_PATH)/lib $(LIBS);strip --strip-unneeded $(ROOT_PATH)/lib/$(LIBS);)
 
 .subdirs:
 	@set -e; $(foreach d, $(SUBDIRS), $(MAKE) -C $(d);)
 
 debug:
-	@echo "INCLUDES:" $(INCLUDES)
-	@echo "PDIR:" $(PDIR)
-	@echo "DEFINES:" $(DEFINES)
 	@echo "SUBDIRS:" $(SUBDIRS)
+	@echo "DIRS:" $(DIRS)
 	@echo "OBJS:" $(OBJS)
-	@echo "OLIBS:" $(OLIBS)
-	@echo "OIMAGES:" $(OIMAGES)
-	@echo "OBINS:" $(OBINS)
-	@echo "GEN_TARGETS:" $(GEN_TARGETS)
-	@echo "GEN_LIBS:" $(GEN_LIBS)
-	@echo "GEN_BINS:" $(GEN_BINS)
-	@echo "GEN_IMAGES:" $(GEN_IMAGES)
 	@echo "CSRCS:" $(CSRCS)
-	@echo "LD_FILE:" $(LD_FILE)
-	@echo "BIN_FILE:" $(BIN_FILE)
-	@echo "OBJODIR:" $(OBJODIR)
-	@echo "LIBODIR:" $(LIBODIR)
-	@echo "IMAGEODIR:" $(IMAGEODIR)
-	@echo "BINODIR:" $(BINODIR)
-	@echo "GEN_BUILTS:" $(GEN_BUILTS)
+	@echo "LIBS:" $(LIBS)
+	@echo "INCLUDES:" $(INCLUDES)
+	@echo "TARGETS:" $(TARGETS)
+	@echo "CFLAGS:" $(CFLAGS)
+	@echo "LDFLAGS:" $(LDFLAGS)
+	@echo "PROJECT_NAME:" $(PROJECT_NAME)
+	@echo "EXTRA_CFLAGS:" $(EXTRA_CFLAGS)
 
-
-ifneq ($(MAKECMDGOALS),clean)
-ifneq ($(MAKECMDGOALS),distclean)
-ifdef DEPS
-sinclude $(DEPS)
-endif
-endif
-endif
-
-$(OBJODIR)/%.o: %.c
+#############################################################
+# src file targets
+# 
+%.o: %.c
 	@echo CC $<
-	@mkdir -p $(OBJODIR);
-	@$(CC) $(CFLAGS) $(COPTS_$(*F)) -o $@ -c $<
+	@$(CC) $(CFLAGS) -o $@ -c $<
 
-$(OBJODIR)/%.d: %.c
-	@mkdir -p $(OBJODIR);
+%.d: %.c
 	@set -e; rm -f $@; \
 	$(CC) -M $(CFLAGS) $< > $@.$$$$; \
-	sed 's,\($*\.o\)[ :]*,$(OBJODIR)/\1 $@ : ,g' < $@.$$$$ > $@; \
+	sed 's,\($*\.o\)[ :]*,\1 $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
 	
-$(OBJODIR)/%.o: %.cpp
-	@echo CPP $<
-	@mkdir -p $(OBJODIR);
-	@$(CPP) $(CFLAGS) $(COPTS_$(*F)) -o $@ -c $<
+%.o: %.cpp
+	@echo CXX $<
+	@$(CXX) $(CFLAGS) -o $@ -c $<
 
-$(OBJODIR)/%.d: %.cpp
-	@mkdir -p $(OBJODIR);
+%.d: %.cpp
 	@set -e; rm -f $@; \
-	$(CPP) -M $(CFLAGS) $< > $@.$$$$; \
-	sed 's,\($*\.o\)[ :]*,$(OBJODIR)/\1 $@ : ,g' < $@.$$$$ > $@; \
+	$(CXX) -M $(CFLAGS) $< > $@.$$$$; \
+	sed 's,\($*\.o\)[ :]*,\1 $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
 
-$(OBJODIR)/%.o: %.s
-	@mkdir -p $(OBJODIR);
+%.o: %.s
 	@echo AS $<
 	@$(CC) $(CFLAGS) -o $@ -c $<
 
-$(OBJODIR)/%.d: %.s
-	@mkdir -p $(OBJODIR); \
+%.d: %.s
 	set -e; rm -f $@; \
 	$(CC) -M $(CFLAGS) $< > $@.$$$$; \
-	sed 's,\($*\.o\)[ :]*,$(OBJODIR)/\1 $@ : ,g' < $@.$$$$ > $@; \
+	sed 's,\($*\.o\)[ :]*,\1 $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
 
-$(OBJODIR)/%.o: %.S
-	@mkdir -p $(OBJODIR);
+%.o: %.S
 	@echo AS $<
 	@$(CC) $(CFLAGS) -D__ASSEMBLER__ -o $@ -c $<
 
-$(OBJODIR)/%.d: %.S
-	@mkdir -p $(OBJODIR); \
+%.d: %.S
 	set -e; rm -f $@; \
 	$(CC) -M $(CFLAGS) $< > $@.$$$$; \
-	sed 's,\($*\.o\)[ :]*,$(OBJODIR)/\1 $@ : ,g' < $@.$$$$ > $@; \
+	sed 's,\($*\.o\)[ :]*,\1 $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
 
-$(foreach lib,$(GEN_LIBS),$(eval $(call ShortcutRule,$(lib),$(LIBODIR))))
-
-$(foreach bin,$(GEN_BINS),$(eval $(call ShortcutRule,$(bin),$(BINODIR))))
-
-$(foreach lib,$(GEN_LIBS),$(eval $(call MakeLibrary,$(basename $(lib)))))
-
-$(foreach image,$(GEN_IMAGES),$(eval $(call MakeImage,$(basename $(image)))))
-
-$(foreach target,$(GEN_TARGETS),$(eval $(call MakeTarget,$(basename $(target)))))
 
 #############################################################
-# Recursion Magic - Don't touch this!!
+# Functions
 #
-# Each subtree potentially has an include directory
-#   corresponding to the common APIs applicable to modules
-#   rooted at that subtree. Accordingly, the INCLUDE PATH
-#   of a module can only contain the include directories up
-#   its parent path, and not its siblings
-#
-# Required for each makefile to inherit from the parent
-#
-INCLUDES += -I $(PDIR)include
-INCLUDES += -I $(PDIR)third_party
-INCLUDES += -I /usr/include
-INCLUDES += -I /usr/local/include
+define MakeLibrary
+$(1).a: $$(OBJS)
+	@echo AR $(1).a
+	@$$(AR) ru $$@ $$^
+endef
+
+define MakeTarget
+$(1).elf: $$(OBJS)
+	@echo LD $$@
+	$$(CC) $$(LDFLAGS) $$(OBJS) -o $$@
+endef
+
+$(foreach lib,$(LIBS),$(eval $(call MakeLibrary,$(basename $(lib)))))
+$(foreach target,$(TARGETS),$(eval $(call MakeTarget,$(basename $(target)))))
+
+DEPS := $(OBJS:.o=.d)
+sinclude $(DEPS)
