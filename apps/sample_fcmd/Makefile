@@ -4,7 +4,7 @@
 
 ROOT_PATH := ../..
 
-DIRS_IGNORE := fsm_simple cJSON_test minilzo_test ssl_test tinyxml_test
+DIRS_IGNORE := fsm_simple minilzo_test tinyxml_test
 DIRS_ALL := $(patsubst ./%,%,$(shell find . -type d))
 DIRS  := $(filter-out $(DIRS_IGNORE),$(DIRS_ALL))
 
@@ -18,9 +18,10 @@ OBJS  := $(addsuffix .o,$(CSRCS))
 CFLAGS += -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
 
 LD_FLAGS += -Wl,-Bdynamic \
-	-lpthread -lssl -lcrypto -lreadline -lncursesw \
+	-lpthread -lssl -lcrypto -lreadline -lncursesw -lm \
 	-Wl,--whole-archive \
 	-lmango \
+	-lcjson \
 	-Wl,--no-whole-archive
 
 TARGETS= $(PROJECT_NAME).elf

@@ -5,10 +5,9 @@
 */
 
 #include "cmd_mem.h"
+#include "cJSON_test/cjson_test.h"
+#include "mango_httpc_test/mango_httpc_test.h"
 
-
-int get_test(char *server, int port, char *url);
-int sslget_test(char *server, uint16_t port, char *url);
 
 /**
  * 系统命令表
@@ -39,8 +38,26 @@ CmdTbl_t CmdTbl[] =
 	{"int strncmp(char *s1,char *s2,int n)",	(void(*)(void))strncmp},
 	{"int printf(char *fmt,...)",	(void(*)(void))printf},
 
+	{"int cJSON_test(void)", (void(*)(void))cJSON_test},
+	{"void json_test_init(int select)", (void(*)(void))json_test_init},
+	{"void json_test_exit(void)", (void(*)(void))json_test_exit},
+	{"void json_struct_print(void *json)", (void(*)(void))json_struct_print},
+	{"void create_objects()", (void(*)(void))create_objects},
+	{"void tuya_json_test(void)", (void(*)(void))tuya_json_test},
+	{"void tuya_json_test2(char *dps_json)", (void(*)(void))tuya_json_test2},
+	{"void json_array_test(int i)", (void(*)(void))json_array_test},
+	{"void json_test_print(void)", (void(*)(void))json_test_print},
+	{"void speech_json_config(void)", (void(*)(void))speech_json_config},
+
+	{"int basicAuth_test(void)", (void(*)(void))basicAuth_test},
 	{"int get_test(char *server, uint16_t port, char *url)", (void(*)(void))get_test},
 	{"int sslget_test(char *server, uint16_t port, char *url)", (void(*)(void))sslget_test},
+	{"int persistent_test(void)", (void(*)(void))persistent_test},
+	{"int post_test(void)", (void(*)(void))post_test},
+	{"int shoutcast_test(void)", (void(*)(void))shoutcast_test},
+	{"int websockets_test(void)", (void(*)(void))websockets_test},
+	{"int ssl_client(void)", (void(*)(void))ssl_client},
+	{"int ssl_server(void)", (void(*)(void))ssl_server},
 
 };
 uint8_t CmdSysTblSize = sizeof(CmdSysTbl) / sizeof(CmdSysTbl[0]);

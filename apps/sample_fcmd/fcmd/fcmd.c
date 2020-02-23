@@ -76,7 +76,7 @@ static void sys_h(void)
 	PRINTF(
 		"---------------------------------------------\n"
 		"fcmd v%s  Robin Zhou\n"
-		"Used:\n"
+		"Usage:\n"
 		"  md(0x00141280, 512, 1)\n"
 		"  memset(0x00141280, 65, 512)\n"
 		"  malloc(1024)\n"

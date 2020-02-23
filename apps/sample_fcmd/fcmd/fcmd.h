@@ -2,12 +2,12 @@
 #define _FCMD_H_
 
 #include <stdio.h>
-#include "stdint.h"
+#include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
 
-#define PRINTF  printf	//如果是内核打印，可以改成printk
+#define PRINTF  printf
 #define PUTC	putchar
 
 #ifdef __cplusplus
@@ -21,5 +21,3 @@ void fcmd_exec(uint8_t *cmd);
 #endif
 
 #endif
-
-

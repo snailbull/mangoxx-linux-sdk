@@ -14,6 +14,7 @@ NM = $(CROSS_COMPILE)nm
 CXX = $(CROSS_COMPILE)g++
 OBJCOPY = $(CROSS_COMPILE)objcopy
 OBJDUMP = $(CROSS_COMPILE)objdump
+STRIP = $(CROSS_COMPILE)strip
 
 LD_FILE := $(ROOT_PATH)/ld/app.ld
 
@@ -39,7 +40,7 @@ clean:
 
 install: 
 	$(foreach d, $(SUBDIR), $(MAKE) -C $(d) install;)
-	$(if $(SUBDIRS),, cp -t $(ROOT_PATH)/lib $(LIBS);strip --strip-unneeded $(ROOT_PATH)/lib/$(LIBS);)
+	$(if $(SUBDIRS),, cp -t $(ROOT_PATH)/lib $(LIBS);$(STRIP) --strip-unneeded $(ROOT_PATH)/lib/$(LIBS);)
 
 .subdirs:
 	@set -e; $(foreach d, $(SUBDIRS), $(MAKE) -C $(d);)
