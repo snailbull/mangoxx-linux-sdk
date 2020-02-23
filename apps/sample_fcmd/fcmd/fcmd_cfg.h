@@ -7,8 +7,6 @@
 #include "cmd_mem.h"
 
 
-int get_test(char *server, int port, char *url);
-int sslget_test(char *server, uint16_t port, char *url);
 
 /**
  * 系统命令表
