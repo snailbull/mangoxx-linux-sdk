@@ -1,182 +1,123 @@
-# common linux makefile
-# 2018-9-4
+#
+# Rules for root path
 #
 # ld -verbose    系统默认的连接脚本
 #
-# LFLAGS+= --eh-frame-hdr -m elf_i386 --hash-style=gnu -dynamic-linker /lib/ld-linux.so.2 
-# LFLAGS+= /usr/lib/gcc/i386-redhat-linux/4.1.1/../../../crt1.o  /usr/lib/gcc/i386-redhat-linux/4.1.1/../../../crti.o  /usr/lib/gcc/i386-redhat-linux/4.1.1/crtbegin.o
-# LFLAGS+= --no-as-needed /usr/lib/gcc/i386-redhat-linux/4.1.1/crtend.o /usr/lib/gcc/i386-redhat-linux/4.1.1/../../../crtn.o
-# gcc -c hello.c -o hello.o
-# ld $(LFLAGS) -o hello hello.o
-#
-# -Wl,-T my.lds   或者使用自己写的ld脚本
-#
 # ldconfig -p | grep libcrypto   查找库文件路径
+#  $^=all depend files   $@=target   $<=first depend files
+#
 
 CROSS_COMPILE = 
 AR = $(CROSS_COMPILE)ar
 CC = $(CROSS_COMPILE)gcc
 NM = $(CROSS_COMPILE)nm
-CPP = $(CROSS_COMPILE)g++
+CXX = $(CROSS_COMPILE)g++
 OBJCOPY = $(CROSS_COMPILE)objcopy
 OBJDUMP = $(CROSS_COMPILE)objdump
 
-__CONFIG_DEBUG = debug
-
-ifeq ($(__CONFIG_DEBUG),debug)
-OUTPUT := .output/debug
-else
-OUTPUT := .output/release
-endif
-
 LD_FILE := $(ROOT_PATH)/ld/app.ld
-BIN_FILE := $(ROOT_PATH)/bin/app.bin
 
-DIRS  ?= $(patsubst %/,%,$(dir $(wildcard */Makefile)))
-CSRCS ?= $(basename $(wildcard *.c)) $(basename $(wildcard *.cpp)) $(basename $(wildcard *.[sS]))
-OBJS := $(CSRCS:%=$(OUTPUT)/%.o)
-DEPS := $(CSRCS:%=$(OUTPUT)/%.d)
+SUBDIRS ?= $(patsubst %/,%,$(dir $(wildcard */Makefile)))
 
-LIBS := $(GEN_LIBS:%=$(OUTPUT)/%)
-BINS := $(GEN_BINS:%=$(OUTPUT)/%)
+CFLAGS += -Ofast -g -Wpointer-arith -Wundef
 
-GEN_BUILTS := $(foreach f,$(DIRS),$(f)/$(OUTPUT)/built-in.o)
+INCLUDES += -I $(ROOT_PATH)/components
 
-CCFLAGS += -g -Wpointer-arith -Wundef
+CFLAGS += $(INCLUDES) $(EXTRA_CFLAGS)
+LDFLAGS += -L$(ROOT_PATH)/lib $(LD_FLAGS) -Wl,--as-needed
 
-CFLAGS = $(CCFLAGS) $(DEFINES) $(INCLUDES)
+
+#############################################################
+# Top targets
+#
+.PHONY: all clean install debug
+all: .subdirs $(OBJS) $(LIBS) $(TARGETS)
+
+clean:
+	$(foreach d,$(SUBDIRS),$(MAKE) -C $(d) clean;)
+	$(if $(SUBDIRS),, find ./ -name "*.[od]" | xargs rm -f;rm -f $(LIBS);)
+
+install: 
+	$(foreach d, $(SUBDIR), $(MAKE) -C $(d) install;)
+	$(if $(SUBDIRS),, cp -t $(ROOT_PATH)/lib $(LIBS);strip --strip-unneeded $(ROOT_PATH)/lib/$(LIBS);)
+
+.subdirs:
+	@set -e; $(foreach d, $(SUBDIRS), $(MAKE) -C $(d);)
+
+debug:
+	@echo "SUBDIRS:" $(SUBDIRS)
+	@echo "DIRS:" $(DIRS)
+	@echo "OBJS:" $(OBJS)
+	@echo "CSRCS:" $(CSRCS)
+	@echo "LIBS:" $(LIBS)
+	@echo "INCLUDES:" $(INCLUDES)
+	@echo "TARGETS:" $(TARGETS)
+	@echo "CFLAGS:" $(CFLAGS)
+	@echo "LDFLAGS:" $(LDFLAGS)
+	@echo "PROJECT_NAME:" $(PROJECT_NAME)
+	@echo "EXTRA_CFLAGS:" $(EXTRA_CFLAGS)
+
+#############################################################
+# src file targets
+# 
+%.o: %.c
+	@echo CC $<
+	@$(CC) $(CFLAGS) -o $@ -c $<
+
+%.d: %.c
+	@set -e; rm -f $@; \
+	$(CC) -M $(CFLAGS) $< > $@.$$$$; \
+	sed 's,\($*\.o\)[ :]*,\1 $@ : ,g' < $@.$$$$ > $@; \
+	rm -f $@.$$$$
+	
+%.o: %.cpp
+	@echo CXX $<
+	@$(CXX) $(CFLAGS) -o $@ -c $<
+
+%.d: %.cpp
+	@set -e; rm -f $@; \
+	$(CXX) -M $(CFLAGS) $< > $@.$$$$; \
+	sed 's,\($*\.o\)[ :]*,\1 $@ : ,g' < $@.$$$$ > $@; \
+	rm -f $@.$$$$
+
+%.o: %.s
+	@echo AS $<
+	@$(CC) $(CFLAGS) -o $@ -c $<
+
+%.d: %.s
+	set -e; rm -f $@; \
+	$(CC) -M $(CFLAGS) $< > $@.$$$$; \
+	sed 's,\($*\.o\)[ :]*,\1 $@ : ,g' < $@.$$$$ > $@; \
+	rm -f $@.$$$$
+
+%.o: %.S
+	@echo AS $<
+	@$(CC) $(CFLAGS) -D__ASSEMBLER__ -o $@ -c $<
+
+%.d: %.S
+	set -e; rm -f $@; \
+	$(CC) -M $(CFLAGS) $< > $@.$$$$; \
+	sed 's,\($*\.o\)[ :]*,\1 $@ : ,g' < $@.$$$$ > $@; \
+	rm -f $@.$$$$
 
 
 #############################################################
 # Functions
 #
-
-define ShortcutRule
-$(1): .subdirs $(2)/$(1)
-endef
-
 define MakeLibrary
-DEP_LIBS_$(1) = $$(foreach lib,$$(filter %.a,$$(COMPONENTS_$(1))),$$(dir $$(lib))$$(OUTPUT)/$$(notdir $$(lib)))
-DEP_OBJS_$(1) = $$(foreach obj,$$(filter %.o,$$(COMPONENTS_$(1))),$$(dir $$(obj))$$(OUTPUT)/$$(notdir $$(obj)))
-$$(OUTPUT)/$(1).a: $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1))
-	@mkdir -p $$(OUTPUT)
-	@$$(if $$(filter %.a,$$?),mkdir -p $$(EXTRACT_DIR)_$(1))
-	@$$(if $$(filter %.a,$$?),cd $$(EXTRACT_DIR)_$(1); $$(foreach lib,$$(filter %.a,$$?),$$(AR) xo $$(UP_EXTRACT_DIR)/$$(lib);))
+$(1).a: $$(OBJS)
 	@echo AR $(1).a
-	@$$(AR) ru $$@ $$(filter %.o,$$?) $$(if $$(filter %.a,$$?),$$(EXTRACT_DIR)_$(1)/*.o)
-	@echo LD built-in.o
-	$$(LD) -r -o $$(OUTPUT)/built-in.o $$(OBJS) $$(foreach f,$$(DIRS),$$(f)/$$(OUTPUT)/built-in.o)
-	@$$(if $$(filter %.a,$$?),$$(RM) -r $$(EXTRACT_DIR)_$(1))
+	@$$(AR) ru $$@ $$^
 endef
 
 define MakeTarget
-DEP_LIBS_$(1) = $$(foreach lib,$$(filter %.a,$$(COMPONENTS_$(1))),$$(dir $$(lib))$$(OUTPUT)/$$(notdir $$(lib)))
-DEP_OBJS_$(1) = $$(foreach obj,$$(filter %.o,$$(COMPONENTS_$(1))),$$(dir $$(obj))$$(OUTPUT)/$$(notdir $$(obj)))
-$(1).elf: $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1))
-	@echo CC $$@
-	$$(CC) $$(LDFLAGS) $$(if $$(LINKFLAGS_$(1)),$$(LINKFLAGS_$(1)),$$(LINKFLAGS_DEFAULT) $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1))) $$(GEN_BUILTS) -o $$@
+$(1).elf: $$(OBJS)
+	@echo LD $$@
+	$$(CC) $$(LDFLAGS) $$(OBJS) -o $$@
 endef
 
-#############################################################
-# Rules base
-# Should be done in top-level makefile only
-#
-.PHONY: all clean distclean
-all: .subdirs $(OBJS) $(LIBS) $(BINS) $(GEN_TARGETS)
+$(foreach lib,$(LIBS),$(eval $(call MakeLibrary,$(basename $(lib)))))
+$(foreach target,$(TARGETS),$(eval $(call MakeTarget,$(basename $(target)))))
 
-clean:
-	@$(foreach d, $(DIRS), $(MAKE) -C $(d) clean;)
-	$(RM) -r $(OUTPUT)
-
-distclean:
-	@$(foreach d, $(DIRS), $(MAKE) -C $(d) distclean;)
-	$(RM) -r $(OUTPUT)
-
-.subdirs:
-	@set -e; $(foreach d, $(DIRS), $(MAKE) -C $(d);)
-
-debug:
-	@echo "INCLUDES:" $(INCLUDES)
-	@echo "DEFINES:" $(DEFINES)
-	@echo "DIRS:" $(DIRS)
-	@echo "OBJS:" $(OBJS)
-	@echo "CSRCS:" $(CSRCS)
-	@echo "LIBS:" $(LIBS)
-	@echo "BINS:" $(BINS)
-	@echo "OUTPUT:" $(OUTPUT)
-	@echo "GEN_TARGETS:" $(GEN_TARGETS)
-	@echo "GEN_LIBS:" $(GEN_LIBS)
-	@echo "GEN_BINS:" $(GEN_BINS)
-	@echo "ABS_ROOT_PATH:" $(ABS_ROOT_PATH)
-	@echo "GEN_BUILTS:" $(GEN_BUILTS)
-	@echo "COMPONENTS_app:" $(COMPONENTS_app)
-	@echo "LINKFLAGS_app:" $(LINKFLAGS_app)
-
-
-ifneq ($(MAKECMDGOALS),clean)
-ifneq ($(MAKECMDGOALS),distclean)
-ifdef DEPS
+DEPS := $(OBJS:.o=.d)
 sinclude $(DEPS)
-endif
-endif
-endif
-
-$(OUTPUT)/%.o: %.c
-	@echo CC $<
-	@mkdir -p $(OUTPUT);
-	@$(CC) $(CFLAGS) $(COPTS_$(*F)) -o $@ -c $<
-
-$(OUTPUT)/%.d: %.c
-	@mkdir -p $(OUTPUT);
-	@set -e; rm -f $@; \
-	$(CC) -M $(CFLAGS) $< > $@.$$$$; \
-	sed 's,\($*\.o\)[ :]*,$(OUTPUT)/\1 $@ : ,g' < $@.$$$$ > $@; \
-	rm -f $@.$$$$
-	
-$(OUTPUT)/%.o: %.cpp
-	@echo CPP $<
-	@mkdir -p $(OUTPUT);
-	@$(CPP) $(CFLAGS) $(COPTS_$(*F)) -o $@ -c $<
-
-$(OUTPUT)/%.d: %.cpp
-	@mkdir -p $(OUTPUT);
-	@set -e; rm -f $@; \
-	$(CPP) -M $(CFLAGS) $< > $@.$$$$; \
-	sed 's,\($*\.o\)[ :]*,$(OUTPUT)/\1 $@ : ,g' < $@.$$$$ > $@; \
-	rm -f $@.$$$$
-
-$(OUTPUT)/%.o: %.s
-	@mkdir -p $(OUTPUT);
-	@echo AS $<
-	@$(CC) $(CFLAGS) -o $@ -c $<
-
-$(OUTPUT)/%.d: %.s
-	@mkdir -p $(OUTPUT); \
-	set -e; rm -f $@; \
-	$(CC) -M $(CFLAGS) $< > $@.$$$$; \
-	sed 's,\($*\.o\)[ :]*,$(OUTPUT)/\1 $@ : ,g' < $@.$$$$ > $@; \
-	rm -f $@.$$$$
-
-$(OUTPUT)/%.o: %.S
-	@mkdir -p $(OUTPUT);
-	@echo AS $<
-	@$(CC) $(CFLAGS) -D__ASSEMBLER__ -o $@ -c $<
-
-$(OUTPUT)/%.d: %.S
-	@mkdir -p $(OUTPUT); \
-	set -e; rm -f $@; \
-	$(CC) -M $(CFLAGS) $< > $@.$$$$; \
-	sed 's,\($*\.o\)[ :]*,$(OUTPUT)/\1 $@ : ,g' < $@.$$$$ > $@; \
-	rm -f $@.$$$$
-
-$(foreach lib,$(GEN_LIBS),$(eval $(call ShortcutRule,$(lib),$(OUTPUT))))
-
-$(foreach bin,$(GEN_BINS),$(eval $(call ShortcutRule,$(bin),$(OUTPUT))))
-
-$(foreach lib,$(GEN_LIBS),$(eval $(call MakeLibrary,$(basename $(lib)))))
-
-$(foreach target,$(GEN_TARGETS),$(eval $(call MakeTarget,$(basename $(target)))))
-
-
-INCLUDES += -I $(ROOT_PATH)/include
-INCLUDES += -I $(ROOT_PATH)/components

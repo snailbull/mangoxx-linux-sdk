@@ -12,28 +12,20 @@ int main(int argc, char *argv[])
 {
 	char *input, shell_prompt[100];
 
-    // Configure readline to auto-complete paths when the tab key is hit.
+	printf("%s,%s,%s,%s\r\n", BUILD_DATE, BUILD_TIME, PROJECT_NAME, USER_SW_VERSION);
+
     rl_bind_key('\t', rl_complete);
 
     for (;;)
     {
-        // Create prompt string from user name and current working directory.
         snprintf(shell_prompt, sizeof(shell_prompt), "%s $ ", getenv("USER"));
-  
-        // Display prompt and read input (n.b. input must be freed after use)...
         input = readline(shell_prompt);
-  
-        // Check for EOF.
         if (!input)
             break;
   
-        // Add input to history.
         add_history(input);
 		
-        // Do stuff...
-		fcmd_exec(input);
-        
-        // Free input.
+        fcmd_exec(input);
         free(input);
 		input = NULL;
     }

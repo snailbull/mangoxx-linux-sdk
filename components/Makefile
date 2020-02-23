@@ -1,30 +1,13 @@
 #
-# Rules for building project
+# Rules for building library
 #
 
 ROOT_PATH := ..
 
-#GEN_IMAGES= app.out
-#GEN_BINS= app.bin
-#GEN_TARGETS= app.elf
+SUBDIR ?= $(patsubst %/,%,$(dir $(wildcard */Makefile)))
 
-DIRS ?= $(patsubst %/,%,$(dir $(wildcard */Makefile)))
+CFLAGS += 
 
-CCFLAGS += -Ofast
-
-TARGET_LDFLAGS =
-
-COMPONENTS_app = \
-	user/libuser.a
-
-LINKFLAGS_app := \
-	-L$(ROOT_PATH)/lib	\
-	-lssl			\
-	-lcrypto		\
-	-lpthread
-
-DEFINES +=
-
-INCLUDES += -I $(ROOT_PATH)/include
+INCLUDES += 
 
 sinclude $(ROOT_PATH)/Makefile

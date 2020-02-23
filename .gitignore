@@ -1,2 +1,4 @@
-.output
-app.elf
+output
+*.elf
+*.[od]
+*.a
