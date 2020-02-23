@@ -46,7 +46,8 @@ mangoHttpClient_t* mango_connect(char* serverIP, uint16_t serverPort){
     return hc;
 }
 
-mangoHttpClient_t *mango_sslconnect(char* serverIP, uint16_t serverPort, ssl_ca_crt_key_t *ssl_cck, ssl_ca_crt_key_file_t *ssl_cck_file, const SSL_METHOD *method, int verify_mode, int frag_len)
+mangoHttpClient_t *mango_sslconnect(char* serverIP, uint16_t serverPort, ssl_ca_crt_key_t *ssl_cck, ssl_ca_crt_key_file_t *ssl_cck_file, 
+	const SSL_METHOD *method, int verify_mode, int frag_len)
 {
     mangoHttpClient_t *hc;
 	int ret=0;

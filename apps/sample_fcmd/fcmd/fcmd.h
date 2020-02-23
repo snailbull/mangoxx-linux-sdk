@@ -2,7 +2,7 @@
 #define _FCMD_H_
 
 #include <stdio.h>
-#include "stdint.h"
+#include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -21,5 +21,3 @@ void fcmd_exec(uint8_t *cmd);
 #endif
 
 #endif
-
-

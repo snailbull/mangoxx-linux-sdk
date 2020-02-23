@@ -11,7 +11,7 @@
 #include <arpa/inet.h>
 
 
-int main(int argc, char *argv[])
+int test_gethost(void)
 {
 	int i;
 	struct hostent *h;
@@ -53,7 +53,6 @@ int main(int argc, char *argv[])
 	}
 
 
-	/***************************************************************/
 	printf("gethostbyaddr\n");
 	struct in_addr sin_addr;
 	sin_addr.s_addr = inet_addr("120.77.1.207");
@@ -93,9 +92,6 @@ int main(int argc, char *argv[])
 		printf("  %s\n", inet_ntoa(*(struct in_addr*)(h->h_addr_list[i])));
 	}
 
-
 	return 0;
 }
-
-
 
