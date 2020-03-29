@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include "mxx_error_code.h"
 
 #define PRINTF  printf
 #define PUTC	putchar
