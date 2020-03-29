@@ -22,11 +22,13 @@ LD_FLAGS += -Wl,-Bdynamic \
 	-Wl,--whole-archive \
 	-lmango \
 	-lcjson \
+	-ljpge \
 	-Wl,--no-whole-archive
 
 TARGETS= $(PROJECT_NAME).elf
 
 INCLUDES += -I $(ROOT_PATH)/apps/$(PROJECT_NAME)
 INCLUDES += -I $(ROOT_PATH)/components/mango
+INCLUDES += -I $(ROOT_PATH)/components/jpge
 
 sinclude $(ROOT_PATH)/Makefile

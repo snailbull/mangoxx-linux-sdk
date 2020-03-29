@@ -2,7 +2,7 @@
 #define _MY_CACHE_H_
 
 #include <stdbool.h>
-#include "kernel/os/os.h"
+// #include "kernel/os/os.h"
 #include "fb_io.h"
 
 // cache_lseek
@@ -32,18 +32,18 @@ struct cache_io;
 struct cache_io
 {
 	// cache文件
-	uint32_t addr;	// cache addr in flash
+	uint8_t *addr;	// cache addr in flash
 	uint32_t magic;
 	int max_size;
 	int size;
 	int wr;			// write f_pos
 	int rd;			// read f_pos
 	int ref_cnt;	// current cache open cnt
-
+	char name[16];
+#if 0
 	// cache_loop线程
 	struct fb_io *pfb;
 	uint8_t flag;
-	char name[16];
 	uint32_t t0, t1, t2;
 	void (*hook)(struct cache_io *c, uint8_t evt_bit);
 	OS_Semaphore_t start_sem;
@@ -51,6 +51,7 @@ struct cache_io
 	OS_Semaphore_t frame_sem;	// fb_io接收一帧完成
 	OS_Semaphore_t cache_sem;	// fb_io全部写入cache完成
 	OS_Thread_t cache_thread;
+#endif
 };
 
 int cache_init(struct cache_io *c, void (*func)(void *), struct fb_io *fb);

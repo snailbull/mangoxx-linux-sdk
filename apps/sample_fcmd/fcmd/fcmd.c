@@ -52,7 +52,7 @@ struct fcmd_t
 	char login_id[32];
 	char login_passwd[64];
 };
-static struct fcmd_t s_fcmd={0, {"root"}, {"c0dec0ffee"}};
+static struct fcmd_t s_fcmd={1, {"root"}, {"c0dec0ffee"}};
 
 /******************************************************************************
  * 系统命令

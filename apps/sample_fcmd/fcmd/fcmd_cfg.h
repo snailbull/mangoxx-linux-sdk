@@ -7,7 +7,7 @@
 #include "cmd_mem.h"
 #include "cJSON_test/cjson_test.h"
 #include "mango_httpc_test/mango_httpc_test.h"
-
+#include "cmd_jpge.h"
 
 /**
  * 系统命令表
@@ -58,6 +58,11 @@ CmdTbl_t CmdTbl[] =
 	{"int websockets_test(void)", (void(*)(void))websockets_test},
 	{"int ssl_client(void)", (void(*)(void))ssl_client},
 	{"int ssl_server(void)", (void(*)(void))ssl_server},
+
+	{"int camera_init(void)", (void(*)(void))camera_init},
+	{"int camera_exit(void)", (void(*)(void))camera_exit},
+	{"int camera_run(char *file)", (void(*)(void))camera_run},
+	{"int camera_compress(void)", (void(*)(void))camera_compress}
 
 };
 uint8_t CmdSysTblSize = sizeof(CmdSysTbl) / sizeof(CmdSysTbl[0]);

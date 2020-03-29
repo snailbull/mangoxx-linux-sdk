@@ -157,7 +157,7 @@ int cmp(void *mem1, void *mem2, int elem_cnt, int elem_size)
 
 	return rcode;
 }
-
+#if 0
 /*****************************************************************************
  * spi flash的两个命令操作
  */
@@ -536,3 +536,4 @@ EXIT:
 
 	return ret;
 }
+#endif

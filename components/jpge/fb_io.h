@@ -21,32 +21,32 @@ struct fb_io
 /**
  * fb io ring buffer
  */
-__inline char *fb_io_buf(struct fb_io *io)
+inline char *fb_io_buf(struct fb_io *io)
 {
 	return (io->buf);
 }
-__inline void fb_io_clear(struct fb_io *io)
+inline void fb_io_clear(struct fb_io *io)
 {
 	io->len = io->tail = io->head = 0;
 	io->real_size = io->size;
 }
 
-__inline char *fb_io_space(struct fb_io *io)
+inline char *fb_io_space(struct fb_io *io)
 {
 	return (io->buf + io->head);
 }
 
-__inline char *fb_io_data(struct fb_io *io)
+inline char *fb_io_data(struct fb_io *io)
 {
 	return (io->buf + io->tail);
 }
 
-__inline int fb_io_space_len(const struct fb_io *io)
+inline int fb_io_space_len(const struct fb_io *io)
 {
 	return (io->real_size - io->len);
 }
 
-__inline int fb_io_space_tail_len(const struct fb_io *io)
+inline int fb_io_space_tail_len(const struct fb_io *io)
 {
 	if (io->head > io->tail)
 	{
@@ -59,7 +59,7 @@ __inline int fb_io_space_tail_len(const struct fb_io *io)
 }
 
 // 如果(head <= tail)，返回tail到尾部边界的数据长度，保证返回的数据内存连续！
-__inline int fb_io_data_len(const struct fb_io *io)
+inline int fb_io_data_len(const struct fb_io *io)
 {
 	if ((io->head <= io->tail) && (io->len > 0))
 	{
@@ -71,12 +71,12 @@ __inline int fb_io_data_len(const struct fb_io *io)
 	}
 }
 
-__inline int fb_io_data_total_len(const struct fb_io *io)
+inline int fb_io_data_total_len(const struct fb_io *io)
 {
 	return (io->len);
 }
 
-__inline int fb_io_inc_tail(struct fb_io *io, int n)
+inline int fb_io_inc_tail(struct fb_io *io, int n)
 {
 	if ((io->len - n) < 0)
 	{
@@ -93,7 +93,7 @@ __inline int fb_io_inc_tail(struct fb_io *io, int n)
 	return n;
 }
 
-__inline int fb_io_inc_head(struct fb_io *io, int n)
+inline int fb_io_inc_head(struct fb_io *io, int n)
 {
 	if ((io->len + n) > io->real_size)
 	{
@@ -108,7 +108,7 @@ __inline int fb_io_inc_head(struct fb_io *io, int n)
 	return n;
 }
 // 判断inc_head是否越界，设置real_size，适应ringbuf尾部边界的DMA单次传输
-__inline void fb_io_resize(struct fb_io *io, int n)
+inline void fb_io_resize(struct fb_io *io, int n)
 {
 	if (((io->head + n) > io->size) &&
 	        ((io->head + n) < (io->size + io->extra_size)))

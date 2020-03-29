@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "driver/chip/hal_flash.h"
+#include "mxx_error_code.h"
 #include "my_cache.h"
 
 
@@ -22,13 +22,15 @@ static int s_cache_cnt;	// all cache open cnt
  */
 int cache_config(struct cache_io *c, uint32_t addr, int max_size)
 {
-	if (c->ref_cnt > 0)
-	{
-		return OS_FAIL;
+	if (c->ref_cnt > 0) {
+		return OPRT_COM_ERROR;
 	}
-	c->addr = addr;
+	c->addr = (uint8_t*)malloc(max_size);
+	if (c->addr == NULL) {
+		return OPRT_COM_ERROR;
+	}
 	c->max_size = max_size;
-	return OS_OK;
+	return OPRT_OK;
 }
 
 /**
@@ -38,31 +40,33 @@ int cache_open(struct cache_io *c)
 {
 	if (c->ref_cnt > 0)
 	{
-		return OS_OK;
+		return OPRT_OK;
 	}
 
 	if (s_cache_cnt <= 0)
 	{
-		if (HAL_Flash_Open(0, HAL_WAIT_FOREVER) != HAL_OK)
-		{
-			printf("open flash(0) fail, cache_open error\n");
-			return OS_FAIL;
-		}
+		// if (HAL_OK != HAL_Flash_Open(0, OS_WAIT_FOREVER))
+		// {
+		// 	printf("open flash(0) fail, cache_open error\n");
+		// 	return OPRT_COM_ERROR;
+		// }
 	}
 	s_cache_cnt++;
 
-	if (HAL_OK != HAL_Flash_Read(0, c->addr, (uint8_t *)&c->magic, 4))
-	{
-		printf("read flash(0) fail, c->size error\n");
-		HAL_Flash_Close(0);
-		return OS_FAIL;
-	}
-	if (HAL_OK != HAL_Flash_Read(0, c->addr+4, (uint8_t *)&c->size, 4))
-	{
-		printf("read flash(0) fail, c->size error\n");
-		HAL_Flash_Close(0);
-		return OS_FAIL;
-	}
+	c->magic = c->addr[0] | (c->addr[1]<<8) | (c->addr[2]<<16) | (c->addr[3]<<24);
+	// if (HAL_OK != HAL_Flash_Read(0, c->addr, (uint8_t *)&c->magic, 4))
+	// {
+	// 	printf("read flash(0) fail, c->size error\n");
+	// 	HAL_Flash_Close(0);
+	// 	return OPRT_COM_ERROR;
+	// }
+	c->size = c->addr[4] | (c->addr[5]<<8) | (c->addr[6]<<16) | (c->addr[7]<<24);
+	// if (HAL_OK != HAL_Flash_Read(0, c->addr+4, (uint8_t *)&c->size, 4))
+	// {
+	// 	printf("read flash(0) fail, c->size error\n");
+	// 	HAL_Flash_Close(0);
+	// 	return OPRT_COM_ERROR;
+	// }
 	c->ref_cnt++;
 	if ((c->magic != CACHE_MAGIC) || ((c->size < 0) && (c->size > c->max_size)))
 	{
@@ -71,24 +75,25 @@ int cache_open(struct cache_io *c)
 	}
 	c->rd = 0;
 	c->wr = 0;
-	return OS_OK;
+	return OPRT_OK;
 }
 int cache_write(struct cache_io *c, uint8_t *buf, uint32_t n)
 {
 	if (c->ref_cnt <= 0)
 	{
 		printf("%s,cache_io.ref_cnt is <=0!\n", c->name);
-		return OS_FAIL;
+		return OPRT_COM_ERROR;
 	}
 	if ((n == 0) || ((c->size + n) > c->max_size))
 	{
 		return 0;
 	}
 
-	if (HAL_OK != HAL_Flash_Write(0, c->addr + 8 + c->wr, buf, n))
-	{
-		return OS_FAIL;
-	}
+	memcpy(c->addr + 8 + c->wr, buf, n);
+	// if (HAL_OK != HAL_Flash_Write(0, c->addr + 8 + c->wr, buf, n))
+	// {
+	// 	return OPRT_COM_ERROR;
+	// }
 
 	c->wr += n;
 	c->size += n;
@@ -102,7 +107,7 @@ int cache_read(struct cache_io *c, uint8_t *buf, uint32_t n)
 	if (c->ref_cnt <= 0)
 	{
 		printf("%s,cache_io.ref_cnt is <=0!\n", c->name);
-		return OS_FAIL;
+		return OPRT_COM_ERROR;
 	}
 
 	if (n == 0)
@@ -123,10 +128,11 @@ int cache_read(struct cache_io *c, uint8_t *buf, uint32_t n)
 		len = n;
 	}
 
-	if (HAL_OK != HAL_Flash_Read(0, c->addr + 8 + c->rd, buf, len))
-	{
-		return OS_FAIL;
-	}
+	memcpy(buf, c->addr + 8 + c->rd, len);
+	// if (HAL_OK != HAL_Flash_Read(0, c->addr + 8 + c->rd, buf, len))
+	// {
+	// 	return OPRT_COM_ERROR;
+	// }
 
 	c->rd += len;
 	return len;
@@ -141,38 +147,42 @@ int cache_clear(struct cache_io *c)
 	if (c->ref_cnt <= 0)
 	{
 		// printf("%s,cache_io.ref_cnt is <=0!\n", c->name);
-		return OS_FAIL;
+		return OPRT_COM_ERROR;
 	}
 
-	blocks = c->size / FLASH_ERASE_64KB + 1;	// align up
-	printf("erase addr %08x, blocks %d, len %d.\r\n", c->addr, blocks, c->size);
+	// blocks = c->size / FLASH_ERASE_64KB + 1;	// align up
+	// printf("erase addr %08x, blocks %d, len %d.\r\n", c->addr, blocks, c->size);
+	memset(c->addr, c->size, 0);
+	
+	uint32_t t = CACHE_MAGIC;
+	memcpy(c->addr, &t, 4);
 
-	if (HAL_OK == HAL_Flash_Erase(0, FLASH_ERASE_64KB, c->addr, blocks))
-	{
-		printf("clear done!\r\n");
-		uint32_t t = CACHE_MAGIC;
-		if (HAL_OK != HAL_Flash_Write(0, c->addr, (uint8_t *)&t, 4))
-		{
-			printf("write c->magic error!\r\n");
-			return OS_FAIL;
-		}
-		t = 0;
-		if (HAL_OK != HAL_Flash_Write(0, c->addr+4, (uint8_t *)&t, 4))
-		{
-			printf("write c->size error!\r\n");
-			return OS_FAIL;
-		}
-		c->magic = CACHE_MAGIC;
-		c->size = 0;
-		c->rd = 0;
-		c->wr = 0;
-	}
-	else
-	{
-		printf("clear error!\r\n");
-	}
+	// if (HAL_OK == HAL_Flash_Erase(0, FLASH_ERASE_64KB, c->addr, blocks))
+	// {
+	// 	printf("clear done!\r\n");
+	// 	uint32_t t = CACHE_MAGIC;
+	// 	if (HAL_OK != HAL_Flash_Write(0, c->addr, (uint8_t *)&t, 4))
+	// 	{
+	// 		printf("write c->magic error!\r\n");
+	// 		return OPRT_COM_ERROR;
+	// 	}
+	// 	t = 0;
+	// 	if (HAL_OK != HAL_Flash_Write(0, c->addr+4, (uint8_t *)&t, 4))
+	// 	{
+	// 		printf("write c->size error!\r\n");
+	// 		return OPRT_COM_ERROR;
+	// 	}
+	// 	c->magic = CACHE_MAGIC;
+	// 	c->size = 0;
+	// 	c->rd = 0;
+	// 	c->wr = 0;
+	// }
+	// else
+	// {
+	// 	printf("clear error!\r\n");
+	// }
 
-	return OS_OK;
+	return OPRT_OK;
 }
 
 /**
@@ -192,7 +202,7 @@ int cache_lseek(struct cache_io *c, int wr_rd, int offset, int whence)
 	if (c->ref_cnt <= 0)
 	{
 		printf("cache_io.ref_cnt is <=0!\n");
-		return OS_FAIL;
+		return OPRT_COM_ERROR;
 	}
 	if (wr_rd == CACHE_WR)
 	{
@@ -215,7 +225,7 @@ int cache_lseek(struct cache_io *c, int wr_rd, int offset, int whence)
 		else
 		{
 			printf("cache_lseek: whence err!\n");
-			return OS_FAIL;
+			return OPRT_COM_ERROR;
 		}
 		return c->wr;
 	}
@@ -236,7 +246,7 @@ int cache_lseek(struct cache_io *c, int wr_rd, int offset, int whence)
 		else
 		{
 			printf("cache_lseek: whence err!\n");
-			return OS_FAIL;
+			return OPRT_COM_ERROR;
 		}
 		return c->rd;
 	}
@@ -247,7 +257,7 @@ int cache_size(struct cache_io *c)
 	if (c->ref_cnt <= 0)
 	{
 		printf("cache_io.ref_cnt is <=0!\n");
-		return OS_FAIL;
+		return OPRT_COM_ERROR;
 	}
 	return c->size;
 }
@@ -255,52 +265,52 @@ int cache_close(struct cache_io *c)
 {
 	if (c->ref_cnt <= 0)
 	{
-		return OS_OK;
+		return OPRT_OK;
 	}
 
-	uint8_t *buf = (uint8_t *)malloc(4096 + 8);
-	uint8_t *pbuf = (uint8_t *)((((uint32_t)buf) + 3) & (~3));// align up
+	// uint8_t *buf = (uint8_t *)malloc(4096 + 8);
+	// uint8_t *pbuf = (uint8_t *)((((uint32_t)buf) + 3) & (~3));// align up
 
-	// read
-	int status = HAL_Flash_Read(0, c->addr, pbuf, 4096);
-	if (status != HAL_OK)
-	{
-		printf("HAL_Flash_Read err!\n");
-		free(buf);
-		pbuf = buf = 0;
-		return OS_FAIL;
-	}
+	// // read
+	// int status = HAL_Flash_Read(0, c->addr, pbuf, 4096);
+	// if (status != HAL_OK)
+	// {
+	// 	printf("HAL_Flash_Read err!\n");
+	// 	free(buf);
+	// 	pbuf = buf = 0;
+	// 	return OPRT_COM_ERROR;
+	// }
 
-	// erase
-	status = HAL_Flash_Erase(0, FLASH_ERASE_4KB, c->addr, 1);
-	if (status != HAL_OK)
-	{
-		printf("HAL_Flash_Erase err!\n");
-		free(buf);
-		pbuf = buf = 0;
-		return OS_FAIL;
-	}
+	// // erase
+	// status = HAL_Flash_Erase(0, FLASH_ERASE_4KB, c->addr, 1);
+	// if (status != HAL_OK)
+	// {
+	// 	printf("HAL_Flash_Erase err!\n");
+	// 	free(buf);
+	// 	pbuf = buf = 0;
+	// 	return OPRT_COM_ERROR;
+	// }
 
-	// write
-	pbuf[0] = CACHE_MAGIC & 0xFF;
-	pbuf[1] = (CACHE_MAGIC >> 8) & 0xFF;
-	pbuf[2] = (CACHE_MAGIC >> 16) & 0xFF;
-	pbuf[3] = (CACHE_MAGIC >> 24) & 0xFF;
-	pbuf[4] = c->size & 0xFF;
-	pbuf[5] = (c->size >> 8) & 0xFF;
-	pbuf[6] = (c->size >> 16) & 0xFF;
-	pbuf[7] = (c->size >> 24) & 0xFF;
-	status = HAL_Flash_Write(0, c->addr, pbuf, 4096);
-	if (status != HAL_OK)
-	{
-		printf("HAL_Flash_Write err!\n");
-		free(buf);
-		pbuf = buf = 0;
-		return OS_FAIL;
-	}
+	// // write
+	// pbuf[0] = CACHE_MAGIC & 0xFF;
+	// pbuf[1] = (CACHE_MAGIC >> 8) & 0xFF;
+	// pbuf[2] = (CACHE_MAGIC >> 16) & 0xFF;
+	// pbuf[3] = (CACHE_MAGIC >> 24) & 0xFF;
+	// pbuf[4] = c->size & 0xFF;
+	// pbuf[5] = (c->size >> 8) & 0xFF;
+	// pbuf[6] = (c->size >> 16) & 0xFF;
+	// pbuf[7] = (c->size >> 24) & 0xFF;
+	// status = HAL_Flash_Write(0, c->addr, pbuf, 4096);
+	// if (status != HAL_OK)
+	// {
+	// 	printf("HAL_Flash_Write err!\n");
+	// 	free(buf);
+	// 	pbuf = buf = 0;
+	// 	return OPRT_COM_ERROR;
+	// }
 
-	free(buf);
-	pbuf = buf = 0;
+	// free(buf);
+	// pbuf = buf = 0;
 
 	c->ref_cnt--;
 	if (c->ref_cnt <= 0)
@@ -308,13 +318,13 @@ int cache_close(struct cache_io *c)
 		s_cache_cnt--;
 		if (s_cache_cnt <= 0)
 		{
-			HAL_Flash_Close(0);
+			// HAL_Flash_Close(0);
 		}
 	}
 
-	return OS_OK;
+	return OPRT_OK;
 }
-
+#if 0
 /******************************************************************************
  * cache_loop thread&sem
  */
@@ -324,33 +334,33 @@ int cache_init(struct cache_io *c, void (*func)(void *), struct fb_io *fb)
 	c->flag = 0;
 	c->hook = cache_hook;
 
-	if (OS_OK != OS_SemaphoreCreate(&c->start_sem, 0, 1))
+	if (OPRT_OK != OS_SemaphoreCreate(&c->start_sem, 0, 1))
 	{
-		return OS_FAIL;
+		return OPRT_COM_ERROR;
 	}
-	if (OS_OK != OS_SemaphoreCreate(&c->fb_sem, 0, 1))
+	if (OPRT_OK != OS_SemaphoreCreate(&c->fb_sem, 0, 1))
 	{
 		OS_SemaphoreDelete(&c->start_sem);
-		return OS_FAIL;
+		return OPRT_COM_ERROR;
 	}
-	if (OS_OK != OS_SemaphoreCreate(&c->frame_sem, 0, 1))
+	if (OPRT_OK != OS_SemaphoreCreate(&c->frame_sem, 0, 1))
 	{
 		OS_SemaphoreDelete(&c->start_sem);
 		OS_SemaphoreDelete(&c->fb_sem);
-		return OS_FAIL;
+		return OPRT_COM_ERROR;
 	}
-	if (OS_OK != OS_SemaphoreCreate(&c->cache_sem, 0, 1))
+	if (OPRT_OK != OS_SemaphoreCreate(&c->cache_sem, 0, 1))
 	{
 		OS_SemaphoreDelete(&c->start_sem);
 		OS_SemaphoreDelete(&c->fb_sem);
 		OS_SemaphoreDelete(&c->frame_sem);
-		return OS_FAIL;
+		return OPRT_COM_ERROR;
 	}
 	if (!OS_ThreadIsValid(&c->cache_thread))
 	{
 		OS_ThreadCreate(&c->cache_thread, c->name, func, c, OS_PRIORITY_NORMAL, 1024);
 	}
-	return OS_OK;
+	return OPRT_OK;
 }
 
 int cache_exit(struct cache_io *c)
@@ -359,23 +369,23 @@ int cache_exit(struct cache_io *c)
 	{
 		OS_ThreadDelete(&c->cache_thread);
 	}
-	if (OS_OK != OS_SemaphoreDelete(&c->start_sem))
+	if (OPRT_OK != OS_SemaphoreDelete(&c->start_sem))
 	{
 		printf("camera cache.start_sem err!\r\n");
 	}
-	if (OS_OK != OS_SemaphoreDelete(&c->fb_sem))
+	if (OPRT_OK != OS_SemaphoreDelete(&c->fb_sem))
 	{
 		printf("camera cache.fb_sem err!\r\n");
 	}
-	if (OS_OK != OS_SemaphoreDelete(&c->frame_sem))
+	if (OPRT_OK != OS_SemaphoreDelete(&c->frame_sem))
 	{
 		printf("camera cache.frame_sem err!\r\n");
 	}
-	if (OS_OK != OS_SemaphoreDelete(&c->cache_sem))
+	if (OPRT_OK != OS_SemaphoreDelete(&c->cache_sem))
 	{
 		printf("camera cache.frame_sem err!\r\n");
 	}
-	return OS_OK;
+	return OPRT_OK;
 }
 
 /**
@@ -419,7 +429,7 @@ void cache_loop(void *arg)
 		OS_SemaphoreWait(&(c->start_sem), OS_WAIT_FOREVER);
 		for (;;)
 		{
-			if ((OS_OK == OS_SemaphoreWait(&(c->fb_sem), 100)) || fb_io_data_total_len(c->pfb))
+			if ((OPRT_OK == OS_SemaphoreWait(&(c->fb_sem), 100)) || fb_io_data_total_len(c->pfb))
 			{
 				len = fb_io_data_len(c->pfb);
 				if (len > 0)
@@ -520,22 +530,22 @@ int test_cache(uint8_t ms, int total_len)
 	if (fb.buf == NULL)
 	{
 		printf("fb.buf malloc error\n");
-		return OS_FAIL;
+		return OPRT_COM_ERROR;
 	}
 	strcpy(cache.name, "test_cache");
 	cache_config(&cache, 0x00300000, 8*64*1024);
 	cache_init(&cache, cache_loop, &fb);
 
 	// run
-	if (OS_OK != cache_open(&cache))
+	if (OPRT_OK != cache_open(&cache))
 	{
 		printf("cache_open err!\n");
-		return OS_FAIL;
+		return OPRT_COM_ERROR;
 	}
-	if (cache_clear(&cache) != OS_OK)
+	if (cache_clear(&cache) != OPRT_OK)
 	{
 		printf("cache_clear err!\n");
-		return OS_FAIL;
+		return OPRT_COM_ERROR;
 	}
 
 	cache_start_fb(&cache);	// cache_io thread loop run
@@ -546,11 +556,11 @@ int test_cache(uint8_t ms, int total_len)
 	}
 	cache_write_fb(&cache, NULL, 0);
 
-	if (OS_OK != OS_SemaphoreWait(&cache.frame_sem, 2000))
+	if (OPRT_OK != OS_SemaphoreWait(&cache.frame_sem, 2000))
 	{
 		printf("frame_sem: wait err!\n");
 	}
-	if (OS_OK != OS_SemaphoreWait(&cache.cache_sem, 2000))
+	if (OPRT_OK != OS_SemaphoreWait(&cache.cache_sem, 2000))
 	{
 		printf("cache_sem: wait err!\n");
 	}
@@ -568,7 +578,7 @@ int test_cache(uint8_t ms, int total_len)
 	free(buf);
 	buf = NULL;
 
-	return OS_OK;
+	return OPRT_OK;
 }
 
 /**
@@ -638,3 +648,4 @@ int uni_flash_erase_v2(int addr, int len)
     HAL_Flash_Close(0);
     return 0;
 }
+#endif

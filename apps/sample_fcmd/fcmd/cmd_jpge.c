@@ -18,7 +18,38 @@
 #endif
 
 camera_fb_t s_camera;
-char file_name[128];
+static char file_name[128];
+
+static int xchg_line(uint8_t *data, int w, int h, int b)
+{
+	uint8_t *buf;
+	int i;
+
+	buf = (uint8_t*)malloc(w*b+64);
+	if (buf == NULL)
+	{
+		CMD_LOG("mem err!");
+		return -1;
+	}
+
+	for (i = 0; i < h/2; i++)
+	{
+		memcpy(buf, data+i*w*b, w*b);
+		memcpy(data+i*w*b, data+(h-i-1)*w*b, w*b);
+		memcpy(data+(h-i-1)*w*b, buf, w*b);
+	}
+	free(buf);
+	buf = 0;
+	return 0;
+}
+
+static char *file_type(char *file)
+{
+	char *p = strrchr(file, '.');
+	if (p == NULL)
+		return NULL;
+	return p;
+}
 
 int camera_init(void)
 {
@@ -47,36 +78,6 @@ int camera_exit(void)
 	return 0;
 }
 
-int xchg_line(uint8_t *data, int w, int h, int b)
-{
-	uint8_t *buf;
-	int i;
-
-	buf = (uint8_t*)malloc(w*b+64);
-	if (buf == NULL)
-	{
-		CMD_LOG("mem err!");
-		return -1;
-	}
-
-	for (i = 0; i < h/2; i++)
-	{
-		memcpy(buf, data+i*w*b, w*b);
-		memcpy(data+i*w*b, data+(h-i-1)*w*b, w*b);
-		memcpy(data+(h-i-1)*w*b, buf, w*b);
-	}
-	free(buf);
-	buf = 0;
-	return 0;
-}
-
-char *file_type(char *file)
-{
-	char *p = strrchr(file, '.');
-	if (p == NULL)
-		return NULL;
-	return p;
-}
 int camera_run(char *file)
 {
 	FILE *fp;

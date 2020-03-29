@@ -22,7 +22,7 @@ SUBDIRS ?= $(patsubst %/,%,$(dir $(wildcard */Makefile)))
 
 CFLAGS += -Ofast -g -Wpointer-arith -Wundef
 
-INCLUDES += -I $(ROOT_PATH)/components
+INCLUDES += -I $(ROOT_PATH)/components -I $(ROOT_PATH)/include
 
 CFLAGS += $(INCLUDES) $(EXTRA_CFLAGS)
 LDFLAGS += -L$(ROOT_PATH)/lib $(LD_FLAGS) -Wl,--as-needed
