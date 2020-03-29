@@ -11,10 +11,6 @@
 // ----------- 8< ------------
 // Following includes are for the linux test build of spiffs
 // These may/should/must be removed/altered/replaced in your target
-#ifndef PLATFORM_LINUX
-#include "esp_spiffs_config.h"
-#else
-#define ICACHE_FLASH_ATTR
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -29,8 +25,6 @@ typedef  uint8_t u8_t;
 typedef long long ptrdiff_t;
 
 #define offsetof(type, member)   (size_t)&(((type *)0)->member)
-
-#endif
 
 // ----------- >8 ------------
 

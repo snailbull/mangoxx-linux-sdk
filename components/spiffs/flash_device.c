@@ -16,7 +16,7 @@ struct flash_file
 {
 	uint8_t *flash_mem;
 	int size;
-	int flag;
+	int flag;		// [0]:flash init,  [1]:
 	char fname[32];
 	int fd;
 };
@@ -28,6 +28,16 @@ static struct flash_file s_flash={
 	.fd = -1
 };
 
+static void die (const char *what)
+{
+	if (errno == 0) {
+		fprintf(stderr, "%s: fatal error\n", what);
+	} else {
+		perror(what);
+	}
+	exit(1);
+}
+
 /**
  * flash file: 8MByte  flash.bin
  * @*fname    "flash.bin"
@@ -38,13 +48,14 @@ int flash_init(void)
 	if (s_flash.flag)
 		return 0;
 	
-	s_flash.fd = open (s_flash.fname, O_CREAT | O_RDWR, 0664);
+	s_flash.fd = open(s_flash.fname, O_CREAT | O_RDWR, 0664);
 	if (s_flash.fd == -1)
 	{
 		return -1;
 	}
 
-	s_flash.flash_mem = malloc(s_flash.size);//mmap (0, FS1_FLASH_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd_img, 0);
+	s_flash.flash_mem = malloc(s_flash.size);
+	//mmap (0, FS1_FLASH_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd_img, 0);
 	if (!s_flash.flash_mem)
 	{
 		return -2;
@@ -53,7 +64,7 @@ int flash_init(void)
 	int n, br;
 	lseek(s_flash.fd, 0, SEEK_SET);
 	n = 0;
-	while ((br = read(fd, s_flash.flash_mem+n, 4096)))
+	while ((br = read(s_flash.fd, s_flash.flash_mem+n, 4096)))
 	{
 		if (br < 0)
 		{
@@ -76,8 +87,9 @@ int flash_flush(void)
 {
 	if (s_flash.flag == 0)
 		return -1;
-	int n=0;
+	int n, bw;
 	lseek(s_flash.fd, 0, SEEK_SET);
+	n = 0;
 	while ((bw = write(s_flash.fd, s_flash.flash_mem+n, 4096)))
 	{
 		if (bw < 0)
@@ -104,6 +116,7 @@ int flash_exit(void)
 	
 	int n, bw;
 	lseek(s_flash.fd, 0, SEEK_SET);
+	n = 0;
 	while ((bw = write(s_flash.fd, s_flash.flash_mem+n, 4096)))
 	{
 		if (bw < 0)
@@ -162,53 +175,22 @@ int flash_erase(uint32_t addr, uint32_t size)
 	return SPIFFS_OK;
 }
 
-
+#ifdef ENABLE_SPIFFS_TOOLS
 /******************************************************************************
- * spiffs system
+ * spiffs tools
  */
-// spiffs config
-#define FS1_FLASH_SIZE      (256*1024)
-#define FS1_FLASH_ADDR      (0x00200000)
-#define SECTOR_SIZE         (4096) 
-#define LOG_BLOCK           (SECTOR_SIZE)
-#define LOG_PAGE			(128)
-#define FD_BUF_SIZE         32*4
-#define CACHE_BUF_SIZE      (LOG_PAGE + 32)*8
+#include "flash_spiffs.h"
 
 static spiffs fs;
 static uint8_t *flash_mem;
-static int retcode = 0;
-static u8_t spiffs_work_buf[LOG_PAGE * 2];
-static u8_t spiffs_fd_buf[FD_BUF_SIZE];
-static u8_t spiffs_cache_buf[CACHE_BUF_SIZE];
+static uint8_t spiffs_work_buf[LOG_PAGE * 2];
+static uint8_t spiffs_fd_buf[FD_BUF_SIZE];
+static uint8_t spiffs_cache_buf[CACHE_BUF_SIZE];
 
-static void die (const char *what)
-{
-	if (errno == 0)
-	{
-		fprintf(stderr, "%s: fatal error\n", what);
-	}
-	else
-	{
-		perror (what);
-	}
-	// if (delete_on_die)
-	// {
-	// 	const char **p = delete_list;
-	// 	while (*p)
-	// 	{
-	// 		unlink(*p);
-	// 		p++;
-	// 	}
-	// }
-	exit (1);
-}
-
-
-static void list (void)
+static void list(char *path)
 {
 	spiffs_DIR dir;
-	if (!SPIFFS_opendir (&fs, "/", &dir))
+	if (!SPIFFS_opendir (&fs, path, &dir))
 	{
 		die ("spiffs_opendir");
 	}
@@ -223,23 +205,21 @@ static void list (void)
 	SPIFFS_closedir (&dir);
 }
 
-
-static void cat (char *fname)
+static void cat(char *fname)
 {
 	spiffs_file fh = SPIFFS_open (&fs, fname, SPIFFS_RDONLY, 0);
-	char buff[512];
+	char buf[512];
 	s32_t n;
-	while ((n = SPIFFS_read (&fs, fh, buff, sizeof (buff))) > 0)
+	while ((n = SPIFFS_read (&fs, fh, buf, sizeof (buf))) > 0)
 	{
-		write (STDOUT_FILENO, buff, n);
+		write (STDOUT_FILENO, buf, n);
 	}
 	SPIFFS_close (&fs, fh);
 }
 
-
-static void import (char *src, char *dst)
+static void import(char *src, char *dst)
 {
-	int fd = open (src, O_RDONLY);
+	int fd = open(src, O_RDONLY);
 	if (fd < 0)
 	{
 		die (src);
@@ -251,10 +231,10 @@ static void import (char *src, char *dst)
 		die ("spiffs_open");
 	}
 
-	char buff[512];
+	char buf[512];
 	s32_t n;
-	while ((n = read (fd, buff, sizeof (buff))) > 0)
-		if (SPIFFS_write (&fs, fh, buff, n) < 0)
+	while ((n = read (fd, buf, sizeof (buf))) > 0)
+		if (SPIFFS_write (&fs, fh, buf, n) < 0)
 		{
 			die ("spiffs_write");
 		}
@@ -263,7 +243,7 @@ static void import (char *src, char *dst)
 	close (fd);
 }
 
-static void export (char *src, char *dst)
+static void export(char *src, char *dst)
 {
 	spiffs_file fh = SPIFFS_open (&fs, src, SPIFFS_RDONLY, 0);
 	if (fh < 0)
@@ -277,10 +257,10 @@ static void export (char *src, char *dst)
 		die (dst);
 	}
 
-	char buff[512];
+	char buf[512];
 	s32_t n;
-	while ((n = SPIFFS_read (&fs, fh, buff, sizeof (buff))) > 0)
-		if (write (fd, buff, n) < 0)
+	while ((n = SPIFFS_read (&fs, fh, buf, sizeof (buf))) > 0)
+		if (write (fd, buf, n) < 0)
 		{
 			die ("write");
 		}
@@ -288,7 +268,6 @@ static void export (char *src, char *dst)
 	SPIFFS_close (&fs, fh);
 	close (fd);
 }
-
 
 char *trim (char *in)
 {
@@ -316,29 +295,28 @@ char *trim (char *in)
 	return out;
 }
 
-
-void syntax (void)
+static void syntax(void)
 {
 	fprintf (stderr,
-	         "Syntax: spiffsimg -f <filename> -c [-l | -i | -r <scriptname> ]\n\n"
-	        );
+		"Syntax: spiffsimg -f <filename> -c [-l | -i | -r <scriptname> ]\n\n");
 	exit (1);
 }
 
-int make_spiffs(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	if (argc == 1)
 	{
-		syntax ();
+		syntax();
 	}
 
 	int opt;
+	int retcode = 0;
 	const char *fname = 0;
 	bool create = false;
 	enum { CMD_NONE, CMD_LIST, CMD_INTERACTIVE, CMD_SCRIPT } command = CMD_NONE;
 	const char *script_name = 0;
 	int flash_idx=0;
-	int fd_img;
+	int fd;
 	int br,bw;
 
 	while ((opt = getopt (argc, argv, "f:lir:c")) != -1)
@@ -370,88 +348,45 @@ int make_spiffs(int argc, char *argv[])
 	{
 		die("Need a filename");
 	}
-
-	fd_img = open (fname, (create ? (O_CREAT | O_TRUNC) : 0) | O_RDWR, 0664);
-	if (fd_img == -1)
-	{
-		die ("open");
-	}
-
-	// map flashmemory
-	flash_mem = malloc(FS1_FLASH_SIZE);//mmap (0, FS1_FLASH_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd_img, 0);
-	if (!flash_mem)
-	{
-		die ("malloc");
-	}
+	strcpy(s_flash.fname, fname);
+	flash_init();
 	if (create)
 	{
-		memset (flash_mem, 0xff, FS1_FLASH_SIZE);
+		flash_erase(0, s_flash.size);
 	}
-	else
-	{
-		// img to flash memory
-		lseek(fd_img, 0, SEEK_SET);
-		flash_idx = 0;
-		while ((br = read(fd_img, flash_mem+flash_idx, 4096)))
-		{
-			if (br < 0)
-			{
-				die("read");
-			}
-			else if (br > 0)
-			{
-				flash_idx += br;
-				if (flash_idx >= FS1_FLASH_SIZE)
-				{
-					printf("img to flash memory success!\n");
-					break;
-				}
-			}
-		}
-	}
-#if 1
+
 	// op flash_mem memory by SPIFFS_mount
 	spiffs_config cfg;
 	cfg.phys_size = FS1_FLASH_SIZE;
-	cfg.phys_addr = 0;
+	cfg.phys_addr = FS1_FLASH_ADDR;
 	cfg.phys_erase_block = SECTOR_SIZE;
 	cfg.log_block_size = LOG_BLOCK;
 	cfg.log_page_size = LOG_PAGE;
 	cfg.hal_read_f = flash_read;
 	cfg.hal_write_f = flash_write;
 	cfg.hal_erase_f = flash_erase;
-	if (cfg.phys_size < 4 * cfg.log_block_size)
-	{
+	if (cfg.phys_size < 4 * cfg.log_block_size) {
 		die("disk not large enough for four blocks");
 	}
 
 	if (SPIFFS_mount (&fs, &cfg,
 	                  spiffs_work_buf,
-	                  spiffs_fd_buf,
-	                  sizeof(spiffs_fd_buf),
-	                  spiffs_cache_buf, CACHE_BUF_SIZE, 0) != 0)
-	{
-		if (create)
-		{
-			if (SPIFFS_format(&fs) != 0)
-			{
+	                  spiffs_fd_buf, sizeof(spiffs_fd_buf),
+	                  spiffs_cache_buf, CACHE_BUF_SIZE, 0) != 0) {
+		if (create) {
+			if (SPIFFS_format(&fs) != 0) {
 				die("spiffs_format");
 			}
 			if (SPIFFS_mount (&fs, &cfg,
 			                  spiffs_work_buf,
-			                  spiffs_fd_buf,
-			                  sizeof(spiffs_fd_buf),
-			                  spiffs_cache_buf, CACHE_BUF_SIZE, 0) != 0)
-			{
+			                  spiffs_fd_buf, sizeof(spiffs_fd_buf),
+			                  spiffs_cache_buf, CACHE_BUF_SIZE, 0) != 0) {
 				die ("spiffs_mount");
 			}
-			if (command == CMD_INTERACTIVE)
-			{
+			if (command == CMD_INTERACTIVE) {
 				printf("Created filesystem -- size 0x%x, block_size=%d\n", cfg.phys_size, cfg.log_block_size);
 			}
-		}
-		else
-		{
+		} else {
 			die ("spiffs_mount");
 		}
 	}
@@ -461,7 +396,7 @@ int make_spiffs(int argc, char *argv[])
 		; // maybe just wanted to create an empty image?
 	else if (command == CMD_LIST)
 	{
-		list ();
+		list("/");
 	}
 	else
 	{
@@ -471,21 +406,21 @@ int make_spiffs(int argc, char *argv[])
 		{
 			die ("fopen");
 		}
-		char buff[128] = { 0 };
+		char buf[128] = { 0 };
 		if (in == stdin)
 		{
 			printf("> ");
 		}
-		while (fgets (buff, sizeof (buff) - 1, in))
+		while (fgets (buf, sizeof (buf) - 1, in))
 		{
-			char *line = trim (buff);
+			char *line = trim (buf);
 			if (!line[0] || line[0] == '#')
 			{
 				continue;
 			}
 			if (strcmp (line, "ls") == 0)
 			{
-				list ();
+				list("/");
 			}
 			else if (strncmp (line, "import ", 7) == 0)
 			{
@@ -559,29 +494,8 @@ int make_spiffs(int argc, char *argv[])
 		}
 	}
 
-	// close spiffsimg
-	SPIFFS_unmount (&fs);
-#endif
-	// flash_mem memory to imgfile
-	lseek(fd_img, 0, SEEK_SET);
-	flash_idx = 0;
-	while ((bw = write(fd_img, flash_mem+flash_idx, 4096)))
-	{
-		if (bw < 0)
-		{
-			die("write,flash_mem memory to imgfile");
-		}
-		else if (bw > 0)
-		{
-			flash_idx += bw;
-			if (flash_idx >= FS1_FLASH_SIZE)
-			{
-				printf("flash memory to imgfile success!\n");
-				break;
-			}
-		}
-	}
-	close(fd_img);
-	free(flash_mem);
+	SPIFFS_unmount(&fs);
+	flash_exit();
 	return retcode;
 }
+#endif

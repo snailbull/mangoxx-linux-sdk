@@ -14,7 +14,7 @@ CSRCS := $(patsubst ./%,%,$(CSRCS))
 OBJS  := $(addsuffix .o,$(CSRCS))
 
 
-CCFLAGS += -fomit-frame-pointer
+CFLAGS += -fomit-frame-pointer
 INCLUDES += 
 
 sinclude $(ROOT_PATH)/Makefile
