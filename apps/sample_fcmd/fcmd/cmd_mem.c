@@ -1,6 +1,7 @@
 #include "fcmd.h"
 
 #include "cmd_mem.h"
+#include "spiffs/flash_device.h"
 
 /*
  * 显示内存内容
@@ -157,7 +158,7 @@ int cmp(void *mem1, void *mem2, int elem_cnt, int elem_size)
 
 	return rcode;
 }
-#if 0
+#if 1
 /*****************************************************************************
  * spi flash的两个命令操作
  */
@@ -182,17 +183,9 @@ int sfmd(uint32_t addr, int elem_cnt, int elem_size)
 		return -1;
 	}
 
-	if (HAL_Flash_Open(PRJCONF_IMG_FLASH, 5000) != HAL_OK)
-	{
-		PRINTF("open %d fail\n", PRJCONF_IMG_FLASH);
-		free(pbuf);
-		pbuf = 0;
-		return -2;
-	}
 	//read
-	status = HAL_Flash_Read(PRJCONF_IMG_FLASH, addr, pbuf, size);
-	HAL_Flash_Close(PRJCONF_IMG_FLASH);
-	if (status != HAL_OK)
+	status = flash_read(addr, size, pbuf);
+	if (status != 0)
 	{
 		PRINTF("HAL_Flash_Read err! (#%08x %d)\n", addr, size);
 		free(pbuf);
@@ -300,7 +293,7 @@ int sfmw(uint32_t writeaddr, uint8_t *pbuf, uint32_t num)
 	uint16_t secoff;
 	uint16_t secremain;
 	uint16_t i;
-	uint8_t *pmen, *pmenalign;
+	uint8_t *pmem, *pmemalign;
 	int ret = 0;
 	int status;
 
@@ -312,45 +305,38 @@ int sfmw(uint32_t writeaddr, uint8_t *pbuf, uint32_t num)
 	{
 		secremain = num;    //不大于4096个字节
 	}
-	pmen = (uint8_t *)malloc(4096 + 8);
-	if (pmen == NULL)
+	pmem = (uint8_t *)malloc(4096 + 8);
+	if (pmem == NULL)
 	{
 		return -1;			//内存错误
 	}
-	pmenalign = (uint8_t *)((((uint32_t)pmen) + 3) & (~3)); //四字节对齐的内存缓冲
+	pmemalign = (uint8_t *)((((uint32_t)pmem) + 3) & (~3)); //四字节对齐的内存缓冲
 
-	if (HAL_Flash_Open(PRJCONF_IMG_FLASH, 5000) != HAL_OK)
-	{
-		PRINTF("open %d fail\n", PRJCONF_IMG_FLASH);
-		free(pmen);
-		pmen = 0;
-		return -2;
-	}
 	while (1)
 	{
-		status = HAL_Flash_Read(PRJCONF_IMG_FLASH, secpos * 4096, pmenalign, 4096);
-		if (status != HAL_OK)
+		status = flash_read(secpos * 4096, 4096, pmemalign);
+		if (status != 0)
 		{
-			PRINTF("HAL_Flash_Read err! (#%08x %d)\n", secpos * 4096, 4096);
+			PRINTF("flash_read err! (#%08x %d)\n", secpos * 4096, 4096);
 			free(pbuf);
 			pbuf = 0;
 			ret = status;
 			break;
 		}
 
-		status = HAL_Flash_Erase(PRJCONF_IMG_FLASH, FLASH_ERASE_4KB, secpos * 4096, 1);//擦除这个扇区
-		if (status != HAL_OK)
+		status = flash_erase(secpos * 4096, 4096);//擦除这个扇区
+		if (status != 0)
 		{
 			ret = status;
 			break;
 		}
 		for (i = 0; i < secremain; i++)	 //复制用户内容
 		{
-			pmenalign[i + secoff] = pbuf[i];
+			pmemalign[i + secoff] = pbuf[i];
 		}
 		//写入整个扇区
-		status = HAL_Flash_Write(PRJCONF_IMG_FLASH, secpos * 4096, pmenalign, 4096);
-		if (status != HAL_OK)
+		status = flash_write(secpos * 4096, 4096, pmemalign);
+		if (status != 0)
 		{
 			ret = status;
 			break;
@@ -377,10 +363,9 @@ int sfmw(uint32_t writeaddr, uint8_t *pbuf, uint32_t num)
 			}
 		}
 	}
-	HAL_Flash_Close(PRJCONF_IMG_FLASH);
 
-	free(pmen);
-	pmen = 0;
+	free(pmem);
+	pmem = 0;
 	return ret;
 }
 
@@ -402,24 +387,18 @@ int sfmc(uint32_t erase_addr, uint32_t erase_mode, uint32_t num)
 		PRINTF("erase_mode not support!\r\n");
 		return -1;
 	}
-	if (HAL_Flash_Open(PRJCONF_IMG_FLASH, 5000) != HAL_OK)
-	{
-		PRINTF("open %d fail\n", PRJCONF_IMG_FLASH);
-		return -1;
-	}
 	erase_addr &= ~(erase_mode - 1);	// align down
 	for (i = 0; i < num; i++)
 	{
 		addr = erase_addr + i * erase_mode;
-		status = HAL_Flash_Erase(PRJCONF_IMG_FLASH, erase_mode, addr, 1);
-		if (status != HAL_OK)
+		status = flash_erase(addr, erase_mode);
+		if (status != 0)
 		{
 			ret = status;
 			break;
 		}
 		PRINTF("erase sec %d, len %d sec.\r\n", addr / 4096, erase_mode / 4096);
 	}
-	HAL_Flash_Close(PRJCONF_IMG_FLASH);
 	return ret;
 }
 /**
@@ -458,16 +437,8 @@ int sfmu(uint32_t start_addr, uint32_t sectors)
 	int ret = 0, used = 0;
 	int i, j;
 
-	if (HAL_Flash_Open(PRJCONF_IMG_FLASH, 5000) != HAL_OK)
-	{
-		PRINTF("open %d fail\n", PRJCONF_IMG_FLASH);
-		return -1;
-	}
-
 	pmem = (uint8_t *)malloc(4096 + 16);
-	if (pmem == NULL)
-	{
-		HAL_Flash_Close(PRJCONF_IMG_FLASH);
+	if (pmem == NULL) {
 		return -1;
 	}
 	pmemalign = (uint8_t *)((((uint32_t)pmem) + 3) & (~3)); //4byte align up
@@ -495,8 +466,8 @@ int sfmu(uint32_t start_addr, uint32_t sectors)
 		}
 
 		// read
-		status = HAL_Flash_Read(PRJCONF_IMG_FLASH, secpos * 4096, pmemalign, 4096);
-		if (status != HAL_OK)
+		status = flash_read(secpos * 4096, 4096, pmemalign);
+		if (status != 0)
 		{
 			PRINTF("\flash read err! (#%08x %d)\n", secpos * 4096, 4096);
 			ret = status;
@@ -532,7 +503,6 @@ EXIT:
 	free(pmem);
 	lp = 0;
 	pmem = pmemalign = 0;
-	HAL_Flash_Close(PRJCONF_IMG_FLASH);
 
 	return ret;
 }

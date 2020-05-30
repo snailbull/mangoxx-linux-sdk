@@ -7,9 +7,6 @@
 extern "C" {
 #endif
 
-/* tuya sdk definition of error code */
-typedef int OPERATE_RET;
-
 #define OPRT_OK                             (0)
 #define OPRT_COM_ERROR                      (-1)
 #define OPRT_INVALID_PARM                   (-2)

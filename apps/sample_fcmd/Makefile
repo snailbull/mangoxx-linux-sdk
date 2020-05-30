@@ -23,6 +23,7 @@ LD_FLAGS += -Wl,-Bdynamic \
 	-lmango \
 	-lcjson \
 	-ljpge \
+	-lspiffs \
 	-Wl,--no-whole-archive
 
 TARGETS= $(PROJECT_NAME).elf

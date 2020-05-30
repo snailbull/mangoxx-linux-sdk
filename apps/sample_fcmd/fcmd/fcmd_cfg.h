@@ -8,6 +8,8 @@
 #include "cJSON_test/cjson_test.h"
 #include "mango_httpc_test/mango_httpc_test.h"
 #include "cmd_jpge.h"
+#include "spiffs/flash_device.h"
+#include "spiffs/flash_spiffs.h"
 
 /**
  * 系统命令表
@@ -25,6 +27,19 @@ CmdTbl_t CmdTbl[] =
 {
 	{"void md(int addr, int elem_cnt, int elem_size)", (void(*)(void))md},
 	{"int cmp(void *addr1, void *addr2, int elem_cnt, int elem_size)", (void(*)(void))cmp},
+	{"int sfmd(uint32_t addr, int elem_cnt, int elem_size)", (void(*)(void))sfmd},
+	{"int sfmw(uint32_t writeaddr, uint8_t *pbuf, uint32_t num)", (void(*)(void))sfmw},
+	{"int sfmc(uint32_t erase_addr, uint32_t erase_mode, uint32_t num)", (void(*)(void))sfmc},
+	{"int sfmu(uint32_t start_addr, uint32_t sectors)", (void(*)(void))sfmu},
+	{"int flash_init(char *fname)", (void(*)(void))flash_init},
+	{"int flash_exit(void)", (void(*)(void))flash_exit},
+	{"int flash_flush(void)", (void(*)(void))flash_flush},
+	{"int platform_spiffs_init(void)", (void(*)(void))platform_spiffs_init},
+	{"int platform_spiffs_exit(int format)", (void(*)(void))platform_spiffs_exit},
+	{"int test_list(char *path)", (void(*)(void))test_list},
+	{"int test_cat(char *fname)", (void(*)(void))test_cat},
+	{"int test_import(char *fname, char *src, int srclen)", (void(*)(void))test_import},
+
 	{"void memset(void *s, int c, size_t n)", (void(*)(void))memset},
 	{"void *memcpy(void *s1, const void *s2, size_t n)", (void(*)(void))memcpy},
 	{"void *malloc(size_t size)", (void(*)(void))malloc},
