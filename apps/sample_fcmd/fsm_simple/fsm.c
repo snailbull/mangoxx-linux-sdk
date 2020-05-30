@@ -1,39 +1,11 @@
-/*******************************************************************************
---事件驱动状态机
---0.01
---zrpeng
---2015-6-13
---
---note:
-
---history:
-	0.01	2015-6-6
-	在stm32上面运行正常，支持低功耗__wfe模式,运行正常，仿照CC2540的osal层写的，
-	增加了有限状态机跳转操作。
-
-	2015-11-5  运行在esp8266上面正常.
-
-	增加os_send_message, 待测试，打算在stm中加
-*******************************************************************************/
 #include "fsm.h"
 
 
-extern void hal_active(uint8_t e);
-extern void task1_active(uint8_t e);
-extern void task2_active(uint8_t e);
-
-
-//状态机,数组偏移就是状态机的id号,自行增加状态机
-static stm_handler tasks_pool[TASKS_CNT] =
-{
-	hal_active,
-	task1_active,
-	task2_active
-};
-static queue_t tasks_queue[TASKS_CNT]; /* 每个状态机对应的消息队列 */
-static uint8_t stm_ret_value;          /* 状态机返回值 */
-static stm_handler stm_state_temp;     /* 临时状态机变量 */
-//static uint8_t message_nesting_cnt;    /* 消息嵌套计数 */
+static stm_handler state[TASKS_CNT];
+static stm_handler temp[TASKS_CNT];
+static uint8_t stm_ret_value[TASKS_CNT];
+static queue_t tasks_queue[TASKS_CNT][8];
+static uint8_t message_nesting_cnt[TASKS_CNT];
 
 //钩子函数, 触发系统再一次进入事件循环
 static void (*dispatch_hook)(void);
@@ -44,32 +16,15 @@ static timer_t timer_pool[TIMER_CNT];
 //static uint32_t tick_previous;
 //static uint32_t sys_tick;
 
-//电源
-#ifdef POWER_SAVING
-static uint32_t power_task_state;		/* 32个位，支持32个fsm,可以扩大 */
-#endif
-
-/*
- * static function
- */
-static void os_power_sleep(void);
-
-/******************************************************************************
-*       事件循环
-*/
-void ICACHE_FLASH_ATTR os_dispatch(void)
+void os_dispatch(void)
 {
 	uint8_t i;
-
+	uint8_t e;
 	next_dispatch = 0;
-	
-	//查询事件并处理
 	for (i = 0; i < TASKS_CNT; i++)
 	{
 		if (tasks_queue[i].used)
 		{
-			uint8_t e;
-			
 			PORT_SR_ALLOC();
 			PORT_CPU_DISABLE();
 			tasks_queue[i].used--;
@@ -81,18 +36,17 @@ void ICACHE_FLASH_ATTR os_dispatch(void)
 			}
 			PORT_CPU_ENABLE();
 
-			(tasks_pool[i])(e);
+			(state[i])(e);
 			if (stm_ret_value == STM_TRAN)
 			{
 				stm_ret_value = 0;
-				(tasks_pool[i])(STM_EXIT_SIG);
-				stm_state_temp(STM_ENTRY_SIG);
-				tasks_pool[i] = stm_state_temp;
+				(state[i])(STM_EXIT_SIG);
+				temp(STM_ENTRY_SIG);
+				state[i] = temp;
 			}
 		}
 	}
 #ifdef POWER_SAVING
-	// 不会有下一次os_dispatch了，可以考虑功耗了
 	if (!next_dispatch)
 	{
 		os_power_sleep();
@@ -100,7 +54,7 @@ void ICACHE_FLASH_ATTR os_dispatch(void)
 #endif
 }
 
-void ICACHE_FLASH_ATTR os_init_tasks(void)
+void os_init_tasks(void)
 {
 	uint8_t i;
 	for (i = 0; i < TASKS_CNT; i++)
@@ -113,7 +67,7 @@ void ICACHE_FLASH_ATTR os_init_tasks(void)
 	}
 }
 
-void ICACHE_FLASH_ATTR os_register_hook(void (*func)(void))
+void os_register_hook(void (*func)(void))
 {
 	dispatch_hook = func;
 }
@@ -121,7 +75,7 @@ void ICACHE_FLASH_ATTR os_register_hook(void (*func)(void))
 /******************************************************************************
 *   事件
 */
-uint8_t ICACHE_FLASH_ATTR os_post_message(uint8_t task_id, uint8_t e)
+uint8_t os_post_message(uint8_t task_id, uint8_t e)
 {
 	PORT_SR_ALLOC();
 	PORT_CPU_DISABLE();
@@ -150,7 +104,7 @@ uint8_t ICACHE_FLASH_ATTR os_post_message(uint8_t task_id, uint8_t e)
 
 	return RET_SUCCESS;
 }
-#if 0
+
 /*
  * notes: 与windows的PostMessage,SendMessage一样，一个是异步执行，一个是同步执行
  *        os_post_message是把消息放到队列里面，等下一次消息循环时取出消息再执行，
@@ -158,7 +112,7 @@ uint8_t ICACHE_FLASH_ATTR os_post_message(uint8_t task_id, uint8_t e)
  *        os_send_message可能会产生递归，所以这里设定了最大递归层数
  *        千万不要在STM_ENTRY_SIG和STM_EXIT_SIG中使用os_send_message
  */
-uint8_t ICACHE_FLASH_ATTR os_send_message(uint8_t task_id, uint8_t e)
+uint8_t os_send_message(uint8_t task_id, uint8_t e)
 {
 	message_nesting_cnt++;	/* ++和--要成对出现 */
 	if (message_nesting_cnt > MESSAGE_NESTING_MAX)
@@ -167,25 +121,20 @@ uint8_t ICACHE_FLASH_ATTR os_send_message(uint8_t task_id, uint8_t e)
 		return NESTING_FULLED;
 	}
 
-	(tasks_pool[task_id])(e);	/* 在这里发生递归 */
+	(state[task_id])(e);	/* 在这里发生递归 */
 	if (stm_ret_value == STM_TRAN)
 	{
 		stm_ret_value = 0;
-		(tasks_pool[task_id])(STM_EXIT_SIG);
-		stm_state_temp(STM_ENTRY_SIG);
-		tasks_pool[task_id] = stm_state_temp;
+		(state[task_id])(STM_EXIT_SIG);
+		temp(STM_ENTRY_SIG);
+		state[task_id] = temp;
 	}
 
 	message_nesting_cnt--;
 	return RET_SUCCESS;
 }
-#endif
 
-
-/******************************************************************************
-*  定时器
-*/
-void ICACHE_FLASH_ATTR os_timer_update(void)
+void os_timer_update(void)
 {
 	uint8_t i;
 
@@ -213,7 +162,7 @@ void ICACHE_FLASH_ATTR os_timer_update(void)
 	}
 }
 
-void ICACHE_FLASH_ATTR os_timer_set(uint8_t task_id, uint8_t sig, uint16_t timeout)
+void os_timer_set(uint8_t task_id, uint8_t sig, uint16_t timeout)
 {
 	uint8_t i;
 
@@ -240,7 +189,7 @@ void ICACHE_FLASH_ATTR os_timer_set(uint8_t task_id, uint8_t sig, uint16_t timeo
 	PORT_CPU_ENABLE();
 }
 
-void ICACHE_FLASH_ATTR os_reload_timer_set(uint8_t task_id, uint8_t sig, uint16_t timeout)
+void os_reload_timer_set(uint8_t task_id, uint8_t sig, uint16_t timeout)
 {
 	uint8_t i;
 
@@ -268,7 +217,7 @@ void ICACHE_FLASH_ATTR os_reload_timer_set(uint8_t task_id, uint8_t sig, uint16_
 	PORT_CPU_ENABLE();
 }
 
-void ICACHE_FLASH_ATTR os_timer_del(uint8_t task_id, uint8_t sig)
+void os_timer_del(uint8_t task_id, uint8_t sig)
 {
 	uint8_t i;
 
@@ -288,36 +237,8 @@ void ICACHE_FLASH_ATTR os_timer_del(uint8_t task_id, uint8_t sig)
 	PORT_CPU_ENABLE();
 }
 
-#ifdef POWER_SAVING
-/******************************************************************************
-*   电源低功耗
-*/
-static void ICACHE_FLASH_ATTR os_power_sleep(void)
-{
-	if (power_task_state == 0)
-	{
-		;
-	}
-}
-void ICACHE_FLASH_ATTR os_power_set(uint8_t task_id, uint8_t state)
-{
-	if (state == POWER_HOLD)
-	{
-		power_task_state |= 1 << task_id;
-	}
-	else if (state == POWER_SLEEP)
-	{
-		power_task_state &= ~(1 << task_id);
-	}
-}
-#endif
-
-/******************************************************************************
-*  有限状态机跳转
-*/
-void ICACHE_FLASH_ATTR os_stm_tran(stm_handler state)
+void os_stm_tran(stm_handler state)
 {
 	stm_ret_value = STM_TRAN;
-	stm_state_temp = state;
+	temp = state;
 }
-

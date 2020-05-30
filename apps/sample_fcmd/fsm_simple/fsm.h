@@ -1,11 +1,11 @@
 #ifndef _FSM_H_
 #define _FSM_H_
 
+#include <stdint.h>
 #include <string.h>
-#include "c_types.h"
 #include "fsm_event.h"
 
-typedef void (*stm_handler)( uint8_t e );
+typedef void (*stm_handler)(uint8_t e);
 
 #define INVALID_TASK_ID			0xFF
 
@@ -13,7 +13,7 @@ typedef void (*stm_handler)( uint8_t e );
 
 enum
 {
-	RET_SUCCESS			= 0,
+	RET_SUCCESS = 0,
 	STM_TRAN,
 	QUEUE_FULLED,
 	QUEUE_EMPTY,
@@ -29,7 +29,7 @@ enum
  */
 #define POWER_SAVING
 #define TASKS_CNT		3
-//#define MESSAGE_NESTING_MAX  6	/* os_send_message的最大消息递归层数 */
+#define MESSAGE_NESTING_MAX  16	/* os_send_message的最大消息递归层数 */
 
 /*
  * 中断临界区宏定义
@@ -43,11 +43,10 @@ void    CPU_SR_Restore (CPU_SR sr);
 #define PORT_CPU_DISABLE()      //{ cpu_sr = CPU_SR_Save();}      /* disable cpu interrupt */
 #define PORT_CPU_ENABLE()       //{ CPU_SR_Restore(cpu_sr);}      /* enable cpu interrupt */
 
-/*
- * 电源宏定义
- */
-#define POWER_HOLD				1
-#define POWER_SLEEP				0
+enum {
+	POWER_SLEEP=0,
+	POWER_HOLD
+};
 
 
 /******************************************************************************
@@ -143,7 +142,7 @@ void os_init_tasks(void);
 void os_register_hook(void (*func)(void));
 
 uint8_t os_post_message(uint8_t task_id, uint8_t sig);
-//uint8_t os_send_message(uint8_t task_id, uint8_t sig);
+uint8_t os_send_message(uint8_t task_id, uint8_t sig);
 
 void os_timer_update(void);
 void os_timer_set(uint8_t task_id, uint8_t sig, uint16_t timeout);
