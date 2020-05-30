@@ -43,7 +43,7 @@ static void die (const char *what)
  * @*fname    "flash.bin"
  * @size   8*1024*1024
  */
-int flash_init(void)
+int flash_init(char *fname)
 {
 	if (s_flash.flag)
 		return 0;
@@ -75,7 +75,7 @@ int flash_init(void)
 			n += br;
 			if (n >= s_flash.size)
 			{
-				printf("img to flash memory success!\n");
+				printf("load flash.bin success!\n");
 				break;
 			}
 		}
@@ -101,12 +101,12 @@ int flash_flush(void)
 			n += bw;
 			if (n >= s_flash.size)
 			{
-				printf("flash memory to imgfile success!\n");
+				printf("save flash.bin success!\n");
 				break;
 			}
 		}
 	}
-	flush(s_flash.fd);
+	fsync(s_flash.fd);
 	return 0;
 }
 int flash_exit(void)
@@ -182,7 +182,6 @@ int flash_erase(uint32_t addr, uint32_t size)
 #include "flash_spiffs.h"
 
 static spiffs fs;
-static uint8_t *flash_mem;
 static uint8_t spiffs_work_buf[LOG_PAGE * 2];
 static uint8_t spiffs_fd_buf[FD_BUF_SIZE];
 static uint8_t spiffs_cache_buf[CACHE_BUF_SIZE];
@@ -233,11 +232,12 @@ static void import(char *src, char *dst)
 
 	char buf[512];
 	s32_t n;
-	while ((n = read (fd, buf, sizeof (buf))) > 0)
+	while ((n = read (fd, buf, sizeof (buf))) > 0) {
 		if (SPIFFS_write (&fs, fh, buf, n) < 0)
 		{
 			die ("spiffs_write");
 		}
+	}
 
 	SPIFFS_close (&fs, fh);
 	close (fd);
@@ -298,10 +298,12 @@ char *trim (char *in)
 static void syntax(void)
 {
 	fprintf (stderr,
-		"Syntax: spiffsimg -f <filename> -c [-l | -i | -r <scriptname> ]\n\n");
+		"Syntax: mkspiffs -f <filename> -c [-l | -i | -r <scriptname> ]\n\n");
 	exit (1);
 }
-
+/**
+ * mkspiffs -f flash.bin -c -r fs.lst
+ */
 int main(int argc, char *argv[])
 {
 	if (argc == 1)
@@ -411,7 +413,7 @@ int main(int argc, char *argv[])
 		{
 			printf("> ");
 		}
-		while (fgets (buf, sizeof (buf) - 1, in))
+		while (fgets(buf, sizeof (buf) - 1, in))
 		{
 			char *line = trim (buf);
 			if (!line[0] || line[0] == '#')

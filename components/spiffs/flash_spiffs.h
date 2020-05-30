@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-#define FS1_FLASH_SIZE      (256*1024)
+#define FS1_FLASH_SIZE      (512*1024)
 #define FS1_FLASH_ADDR      (0x00200000)
 #define SECTOR_SIZE         (4096) 
 #define LOG_BLOCK           (SECTOR_SIZE)
@@ -16,11 +16,10 @@ extern "C" {
 #define CACHE_BUF_SIZE      (LOG_PAGE + 32)*8
 
 int platform_spiffs_init(void);
-void platform_spiffs_exit(int format);
-
-void test_list(char *path);
-void test_cat(char *fname);
-void test_import(char *fname, char *src, int srclen);
+int platform_spiffs_exit(int format);
+int test_list(char *path);
+int test_cat(char *fname);
+int test_import(char *fname, char *src, int srclen);
 
 #ifdef __cplusplus
 }

@@ -142,17 +142,18 @@ int platform_spiffs_init(void)
     return ret;
 }
 
-void platform_spiffs_exit(int format)
+int platform_spiffs_exit(int format)
 {
     if (SPIFFS_mounted(&fs_ctx.fs)) {
         SPIFFS_unmount(&fs_ctx.fs);
         free(fs_ctx.work_buf);
         free(fs_ctx.fd_buf);
         free(fs_ctx.cache_buf);
-        if (format) {
-            SPIFFS_format(&fs_ctx.fs);
-        }
     }
+	if (format) {
+		SPIFFS_format(&fs_ctx.fs);
+	}
+	return 0;
 }
 
 static void die(char *what)
@@ -160,13 +161,13 @@ static void die(char *what)
     printf("die:%s\r\n", what);
 }
 
-void test_list(char *path)
+int test_list(char *path)
 {
     spiffs_DIR dir;
     if (!SPIFFS_opendir (&fs_ctx.fs, path, &dir))
     {
         die("spiffs_opendir");
-        return ;
+        return fs_ctx.fs.err_code;
     }
     struct spiffs_dirent de;
     while (SPIFFS_readdir (&dir, &de))
@@ -177,9 +178,10 @@ void test_list(char *path)
         printf("%c %6u %s\n", types[de.type], de.size, name);
     }
     SPIFFS_closedir (&dir);
+	return fs_ctx.fs.err_code;
 }
 
-void test_cat(char *fname)
+int test_cat(char *fname)
 {
     spiffs_file fh = SPIFFS_open (&fs_ctx.fs, fname, SPIFFS_RDONLY, 0);
     char *buf;
@@ -187,7 +189,7 @@ void test_cat(char *fname)
     if (buf == NULL)
     {
         printf("malloc err\n");
-        return ;
+		return fs_ctx.fs.err_code;
     }
 
 	printf("\n");
@@ -199,23 +201,23 @@ void test_cat(char *fname)
         	printf("%c", buf[i]);
     }
     SPIFFS_close (&fs_ctx.fs, fh);
-    printf("\nSPIFFS_close err_code:%d\n", fs_ctx.fs.err_code);
     free(buf);
     buf = NULL;
+	return fs_ctx.fs.err_code;
 }
 
-void test_import(char *fname, char *src, int srclen)
+int test_import(char *fname, char *src, int srclen)
 {
     spiffs_file fh = SPIFFS_open (&fs_ctx.fs, fname, SPIFFS_CREAT | SPIFFS_TRUNC | SPIFFS_WRONLY, 0);
     if (fh < 0)
     {
         printf("spiffs_open err\n");
-        return;
+		return fs_ctx.fs.err_code;
     }
 
     if (SPIFFS_write (&fs_ctx.fs, fh, src, srclen) < 0)
         die ("spiffs_write");
 
     SPIFFS_close (&fs_ctx.fs, fh);
-    printf("\nSPIFFS_close err_code:%d\n", fs_ctx.fs.err_code);
+	return fs_ctx.fs.err_code;
 }

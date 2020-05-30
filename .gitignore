@@ -2,3 +2,4 @@ output
 *.elf
 *.[od]
 *.a
+flash.bin
