@@ -443,7 +443,7 @@ void fcmd_exec(char *cmd)
 	// 是否已经登录
 	if (s_fcmd.login_flag == 0)
 	{
-		char id_len=strlen(s_fcmd.login_id), passwd_len=strlen(s_fcmd.login_passwd);
+		char id_len = strlen(s_fcmd.login_id), passwd_len=strlen(s_fcmd.login_passwd);
 		if ((strlen(pcmd) == (id_len+passwd_len+1)) &&
 			(strncmp(pcmd, s_fcmd.login_id, id_len) == 0) &&
 			(*(pcmd+id_len) == '@') &&
