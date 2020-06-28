@@ -1,9 +1,8 @@
-#ifndef _FCMD_CFG_H_
-#define _FCMD_CFG_H_
+#include "cmd_all.h"
+
 /*******************************************************************************
 * 用户函数命令头文件包含，函数声明
 */
-
 #include "cmd_mem.h"
 #include "cJSON_test/cjson_test.h"
 #include "mango_httpc_test/mango_httpc_test.h"
@@ -60,7 +59,5 @@ CmdTbl_t CmdTbl[] =
 	{"int ssl_server(void)", (void(*)(void))ssl_server},
 
 };
-uint8_t CmdSysTblSize = sizeof(CmdSysTbl) / sizeof(CmdSysTbl[0]);
-uint8_t CmdTblSize = sizeof(CmdTbl) / sizeof(CmdTbl[0]);
-
-#endif
+int CmdSysTblSize = sizeof(CmdSysTbl) / sizeof(CmdSysTbl[0]);
+int CmdTblSize = sizeof(CmdTbl) / sizeof(CmdTbl[0]);

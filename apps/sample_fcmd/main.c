@@ -7,6 +7,7 @@
 #include <semaphore.h>
 
 #include "fcmd/fcmd.h"
+#include "fcmd/cmd_all.h"
 
 int main(int argc, char *argv[])
 {
@@ -15,6 +16,7 @@ int main(int argc, char *argv[])
 	printf("%s,%s,%s,%s\r\n", BUILD_DATE, BUILD_TIME, PROJECT_NAME, USER_SW_VERSION);
 
     rl_bind_key('\t', rl_complete);
+    fcmd_register(CmdTbl, CmdTblSize, CmdSysTbl, CmdSysTblSize);
 
     for (;;)
     {

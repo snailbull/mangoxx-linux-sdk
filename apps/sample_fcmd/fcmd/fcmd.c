@@ -19,28 +19,18 @@
 		目前运行正常
 	0.03增加对可变参数的支持,eg:int printf(const char *fmt, ...)
 	1.0.4增加密码登录，分离系统命令和函数命令表
+	1.1.0 修改命令表分离，采用注册的方式增加命令表
 *******************************************************************************/
 #include "fcmd.h"
 #include "cmd_mem.h"
 
 #define PARAMS_NUM  10	//函数支持10个参数
 #define _args_t  int	//参数类型，对于16bit和8bit单片机要注意
-#define FCMD_VERSION	"1.0.4"
+#define FCMD_VERSION	"1.1.0"
 
-typedef struct
-{
-	char *fname;
-	void (*pfunc)(void);
-} CmdTbl_t;
-
-static int8_t get_args_num(uint8_t *str, uint8_t *key);
-static void get_args(uint8_t *str, uint8_t *key, _args_t *args);
-static uint8_t *get_fname(uint8_t *str, uint8_t *len);
-static void sys_ls(void);
-static void sys_h(void);
-static void sys_q(void);
-
-#include "fcmd_cfg.h"
+static int get_args_num(char *str, char *key);
+static void get_args(char *str, char *key, _args_t *args);
+static char *get_fname(char *str, int *len);
 
 /**
  * root@c0dec0ffee
@@ -51,27 +41,33 @@ struct fcmd_t
 	int login_flag;
 	char login_id[32];
 	char login_passwd[64];
+
+	CmdTbl_t *p_sys_tbl;
+	int sys_tbl_size;
+
+	CmdTbl_t *p_func_tbl;
+	int func_tbl_size;
 };
-static struct fcmd_t s_fcmd={0, {"root"}, {"c0dec0ffee"}};
+static struct fcmd_t s_fcmd={0, {"root"}, {"c0dec0ffee"}, 0,0, 0,0};
 
 /******************************************************************************
  * 系统命令
  */
-static void sys_ls(void)
+void sys_ls(void)
 {
-	uint8_t i;
+	int i;
 	PRINTF("------------- function list --------------\n");
-	for (i = 0; i < CmdSysTblSize; i++)
+	for (i = 0; i < s_fcmd.sys_tbl_size; i++)
 	{
-		PRINTF("0x%08x: %s\n", (int)CmdSysTbl[i].pfunc, CmdSysTbl[i].fname);
+		PRINTF("0x%08x: %s\n", (int)s_fcmd.p_sys_tbl[i].pfunc, s_fcmd.p_sys_tbl[i].fname);
 	}
-	for (i = 0; i < CmdTblSize; i++)
+	for (i = 0; i < s_fcmd.func_tbl_size; i++)
 	{
-		PRINTF("0x%08x: %s\n", (int)CmdTbl[i].pfunc, CmdTbl[i].fname);
+		PRINTF("0x%08x: %s\n", (int)s_fcmd.p_func_tbl[i].pfunc, s_fcmd.p_func_tbl[i].fname);
 	}
 	PRINTF("-------------------------------------------\n");
 }
-static void sys_h(void)
+void sys_h(void)
 {
 	PRINTF(
 		"---------------------------------------------\n"
@@ -83,7 +79,7 @@ static void sys_h(void)
 		"  free(0x00141280)\n"
 		"---------------------------------------------\n", FCMD_VERSION);
 }
-static void sys_q(void)
+void sys_q(void)
 {
 	s_fcmd.login_flag = 0;
 }
@@ -98,28 +94,28 @@ static void sys_q(void)
  *        -1   一个分隔符也没有，eg：ls命令就没有()分隔符
  *        >=0  参数个数，eg:timer_pwm_set(5,67)，分隔符是(,)很明显有2个参数
  */
-static int8_t get_args_num(uint8_t *str, uint8_t *key)
+static int get_args_num(char *str, char *key)
 {
-	uint8_t *pch;
-	uint8_t *pbrk[PARAMS_NUM * 2]; //指向断点(,)
-	int8_t brk_cnt;
+	char *pch;
+	char *pbrk[PARAMS_NUM * 2]; //指向断点(,)
+	int brk_cnt;
 
 	brk_cnt = 0;
-	pch = (uint8_t *)strpbrk ((char *)str, (char *)key);
+	pch = strpbrk (str, key);
 	while (pch != NULL)
 	{
 		pbrk[brk_cnt] = pch;
 		brk_cnt++;
-		pch = (uint8_t *)strpbrk ((char *)(pch + 1), (char *)key);
+		pch = strpbrk (pch + 1, key);
 	}
 
 	if (brk_cnt == 2)//"(void)" or "(int a)" or "(  )" or "(void *p)"
 	{
-		uint8_t *t = pbrk[0] + 1;
+		char *t = pbrk[0] + 1;
 
-		if (strstr((char *)(pbrk[0] + 1), "void") != NULL)
+		if (strstr(pbrk[0] + 1, "void") != NULL)
 		{
-			if (strchr((char *)(pbrk[0] + 1), '*') != NULL)
+			if (strchr(pbrk[0] + 1, '*') != NULL)
 			{
 				return 1;
 			}
@@ -146,7 +142,7 @@ static int8_t get_args_num(uint8_t *str, uint8_t *key)
 	else if (brk_cnt == 3)
 	{
 		//判断可变参数的情况,eg:int printf(const char *fmt, ...)
-		if (strstr((char *)pbrk[0], ".." ) != NULL)
+		if (strstr(pbrk[0], ".." ) != NULL)
 		{
 			return -2;
 		}
@@ -162,7 +158,7 @@ static int8_t get_args_num(uint8_t *str, uint8_t *key)
  * return 为空返回TRUE, 不为空返回FALSE
  * note   [head, tail), 左闭右开
  */
-static int8_t span_isspace(uint8_t *head, uint8_t *tail)
+static int span_isspace(char *head, char *tail)
 {
 	while (head != tail)
 	{
@@ -187,19 +183,19 @@ static int8_t span_isspace(uint8_t *head, uint8_t *tail)
  *       合法字符串示范:disp("value:"56V,""), disp("value:\"56\""),
  *       要保证"成对出现,否则报错
  */
-static void get_args(uint8_t *str, uint8_t *key, _args_t *args)
+static void get_args(char *str, char *key, _args_t *args)
 {
-	uint8_t *pch;
-	uint8_t *pbrk[PARAMS_NUM * 3]; //指向分隔符(,)"
-	int8_t brk_cnt;
+	char *pch;
+	char *pbrk[PARAMS_NUM * 3]; //指向分隔符(,)"
+	int brk_cnt;
 
 	brk_cnt = 0;
-	pch = (uint8_t *)strpbrk ((char *)str, (char *)key);
+	pch = strpbrk (str, key);
 	while ((pch != NULL) && (brk_cnt < PARAMS_NUM * 3))	//分隔符不能太多
 	{
 		pbrk[brk_cnt] = pch;
 		brk_cnt++;
-		pch = (uint8_t *)strpbrk ((char *)(pch + 1), (char *)key);
+		pch = strpbrk (pch + 1, key);
 	}
 
 	if (brk_cnt == 0)//没有(,)就是系统命令
@@ -218,7 +214,7 @@ static void get_args(uint8_t *str, uint8_t *key, _args_t *args)
 
 			if (brk_cnt == 2)//2个，两种可能：一个参数或没有参数
 			{
-				uint8_t *t = pbrk[0] + 1;
+				char *t = pbrk[0] + 1;
 
 				while (t != pbrk[1])
 				{
@@ -230,18 +226,18 @@ static void get_args(uint8_t *str, uint8_t *key, _args_t *args)
 					else
 					{
 						args[0] = 1;//有一个参数
-						args[1] = strtol((char *)(pbrk[0] + 1), NULL, 0);
+						args[1] = strtol(pbrk[0] + 1, NULL, 0);
 						break;
 					}
 				}
 			}
 			else//3个及以上, 处理最复杂的情况
 			{
-				uint8_t quotation_cnt;
-				uint8_t i;
-				uint8_t args_cnt;
-				uint8_t state;
-				uint8_t finding;
+				int quotation_cnt;
+				int i;
+				int args_cnt;
+				int state;
+				int finding;
 
 				//双引号数量是否成对
 				quotation_cnt = 0;
@@ -262,7 +258,7 @@ static void get_args(uint8_t *str, uint8_t *key, _args_t *args)
 
 					for (i = 0; i < brk_cnt; i++)//转换成整型数
 					{
-						args[i + 1] = strtol((char *)(pbrk[i] + 1), NULL, 0);
+						args[i + 1] = strtol(pbrk[i] + 1, NULL, 0);
 					}
 
 					args[0] = brk_cnt - 1;
@@ -317,7 +313,7 @@ static void get_args(uint8_t *str, uint8_t *key, _args_t *args)
 
 						case 1://整型参数
 							{
-								args[args_cnt] = strtol((char *)(pbrk[i] + 1), NULL, 0);
+								args[args_cnt] = strtol(pbrk[i] + 1, NULL, 0);
 								args_cnt++;
 
 								i++;			//下一个,
@@ -328,7 +324,7 @@ static void get_args(uint8_t *str, uint8_t *key, _args_t *args)
 
 						case 2://字符串参数
 							{
-								uint8_t is_string_end;
+								int is_string_end;
 
 								args[args_cnt] = (_args_t)(pbrk[i] + 1);
 								args_cnt++;
@@ -396,17 +392,17 @@ static void get_args(uint8_t *str, uint8_t *key, _args_t *args)
 
 /*
  * 从CmdTbl中获取函数名
- * @str CmdTbl[i].fname
+ * @str s_fcmd.p_func_tbl[i].fname
  * @len 返回函数名长度
  *
  * return 返回用户函数名指针
  */
-static uint8_t *get_fname(uint8_t *str, uint8_t *len)
+static char *get_fname(char *str, int *len)
 {
-	uint8_t *phead;
-	uint8_t *pend;
+	char *phead;
+	char *pend;
 
-	phead = (uint8_t *)strchr((char *)str, '(');
+	phead = strchr(str, '(');
 
 	//跳过尾部空格,\t
 	phead--;
@@ -430,30 +426,28 @@ static uint8_t *get_fname(uint8_t *str, uint8_t *len)
  * 函数命令行执行
  * @cmd 函数命令行, eg: timer_pwm_set(0, 567)
  */
-void fcmd_exec(uint8_t *cmd)
+void fcmd_exec(char *cmd)
 {
-	uint8_t *pcmd = cmd;
+	char *pcmd = cmd;
 	_args_t args[PARAMS_NUM + 1]; 	//参数数组
 	_args_t ret = 0;
-	uint8_t i;
-	int8_t cmdtbl_param_num;
+	int i;
+	int cmdtbl_param_num;
 	
 	if (*pcmd == '\0')
 		return ;
 	//跳过开头空格
 	while (*pcmd == ' ')
-	{
 		pcmd++;
-	}
 
 	// 是否已经登录
 	if (s_fcmd.login_flag == 0)
 	{
 		char id_len=strlen(s_fcmd.login_id), passwd_len=strlen(s_fcmd.login_passwd);
-		if ((strlen((char*)pcmd) == (id_len+passwd_len+1)) &&
-			(strncmp((char*)pcmd, s_fcmd.login_id, id_len) == 0) &&
+		if ((strlen(pcmd) == (id_len+passwd_len+1)) &&
+			(strncmp(pcmd, s_fcmd.login_id, id_len) == 0) &&
 			(*(pcmd+id_len) == '@') &&
-			(strncmp((char*)&pcmd[id_len+1], s_fcmd.login_passwd, passwd_len) == 0))
+			(strncmp(&pcmd[id_len+1], s_fcmd.login_passwd, passwd_len) == 0))
 		{
 			s_fcmd.login_flag = 1;
 			PRINTF("Hello World!\n");
@@ -463,7 +457,7 @@ void fcmd_exec(uint8_t *cmd)
 
 	//分离参数
 	memset(args, 0, PARAMS_NUM + 1);
-	get_args(pcmd, (uint8_t *)"(,)\"", args);
+	get_args(pcmd, "(,)\"", args);
 
 	if (args[0] == -2)
 	{
@@ -473,16 +467,21 @@ void fcmd_exec(uint8_t *cmd)
 
 	if (args[0] == -1)
 	{
-		//系统命令
-		for (i = 0; i < CmdSysTblSize; i++)
+		if (s_fcmd.p_sys_tbl == NULL)
 		{
-			if (strncmp((char *)pcmd, CmdSysTbl[i].fname, strlen((char *)pcmd)) == 0)
+			PRINTF("err:no sys_tbl\n");
+			return ;
+		}
+		//系统命令
+		for (i = 0; i < s_fcmd.sys_tbl_size; i++)
+		{
+			if (strncmp(pcmd, s_fcmd.p_sys_tbl[i].fname, strlen(pcmd)) == 0)
 			{
 				break;
 			}
 		}
 
-		if (i >= CmdSysTblSize)
+		if (i >= s_fcmd.sys_tbl_size)
 		{
 			PRINTF("err:system cmd err\n");
 			return ;
@@ -490,16 +489,21 @@ void fcmd_exec(uint8_t *cmd)
 	}
 	else
 	{
-		//函数命令
-		for (i = 0; i < CmdTblSize; i++)
+		if (s_fcmd.p_func_tbl == NULL)
 		{
-			uint8_t *pcmd_end;
-			uint8_t pfname_len;
-			uint8_t pcmd_len;
-			uint8_t *pfname = get_fname((uint8_t *)CmdTbl[i].fname, &pfname_len);
+			PRINTF("err:no func_tbl\n");
+			return ;
+		}
+		//函数命令
+		for (i = 0; i < s_fcmd.func_tbl_size; i++)
+		{
+			char *pcmd_end;
+			int pfname_len;
+			int pcmd_len;
+			char *pfname = get_fname(s_fcmd.p_func_tbl[i].fname, &pfname_len);
 
 			//malloc (int size), pcmd_end指向'c'
-			pcmd_end = pcmd + strlen((char *)pcmd) - 1;
+			pcmd_end = pcmd + strlen(pcmd) - 1;
 			while (*pcmd_end == ' ')//跳过空格
 			{
 				--pcmd_end;
@@ -507,14 +511,14 @@ void fcmd_exec(uint8_t *cmd)
 			pcmd_len = pcmd_end - pcmd + 1;
 
 			//比较函数名
-			if (strncmp((char *)pfname, (char *)pcmd, pcmd_len > pfname_len ? pcmd_len : pfname_len) == 0)
+			if (strncmp(pfname, pcmd, pcmd_len > pfname_len ? pcmd_len : pfname_len) == 0)
 			{
 				break;
 			}
 		}
 
 		//没有匹配到命令
-		if (i >= CmdTblSize)
+		if (i >= s_fcmd.func_tbl_size)
 		{
 			PRINTF("err:no such cmd\n");
 			return;
@@ -525,7 +529,7 @@ void fcmd_exec(uint8_t *cmd)
 	if (args[0] != -1)
 	{
 		//函数命令
-		cmdtbl_param_num = get_args_num((uint8_t *)CmdTbl[i].fname, (uint8_t *)"(,)");
+		cmdtbl_param_num = get_args_num(s_fcmd.p_func_tbl[i].fname, "(,)");
 		if (cmdtbl_param_num == -2)
 		{
 			;//可变参数情况
@@ -539,7 +543,7 @@ void fcmd_exec(uint8_t *cmd)
 	else
 	{
 		//执行系统命令
-		(*(_args_t(*)())CmdSysTbl[i].pfunc)();
+		(*(_args_t(*)())s_fcmd.p_sys_tbl[i].pfunc)();
 		return;
 	}
 
@@ -547,50 +551,50 @@ void fcmd_exec(uint8_t *cmd)
 	switch (args[0])
 	{
 	case 0:
-		ret = (*(_args_t(*)())CmdTbl[i].pfunc)();
+		ret = (*(_args_t(*)())s_fcmd.p_func_tbl[i].pfunc)();
 		break;
 
 	case 1:
-		ret = (*(_args_t(*)(_args_t))CmdTbl[i].pfunc)(args[1]);
+		ret = (*(_args_t(*)(_args_t))s_fcmd.p_func_tbl[i].pfunc)(args[1]);
 		break;
 
 	case 2:
-		ret = (*(_args_t(*)(_args_t, _args_t))CmdTbl[i].pfunc)(args[1], args[2]);
+		ret = (*(_args_t(*)(_args_t, _args_t))s_fcmd.p_func_tbl[i].pfunc)(args[1], args[2]);
 		break;
 
 	case 3:
-		ret = (*(_args_t(*)(_args_t, _args_t, _args_t))CmdTbl[i].pfunc)(args[1], args[2], args[3]);
+		ret = (*(_args_t(*)(_args_t, _args_t, _args_t))s_fcmd.p_func_tbl[i].pfunc)(args[1], args[2], args[3]);
 		break;
 
 	case 4:
-		ret = (*(_args_t(*)(_args_t, _args_t, _args_t, _args_t))CmdTbl[i].pfunc)(args[1], args[2], args[3], args[4]);
+		ret = (*(_args_t(*)(_args_t, _args_t, _args_t, _args_t))s_fcmd.p_func_tbl[i].pfunc)(args[1], args[2], args[3], args[4]);
 		break;
 
 	case 5:
-		ret = (*(_args_t(*)(_args_t, _args_t, _args_t, _args_t, _args_t))CmdTbl[i].pfunc)(args[1], args[2], args[3], args[4], args[5]);
+		ret = (*(_args_t(*)(_args_t, _args_t, _args_t, _args_t, _args_t))s_fcmd.p_func_tbl[i].pfunc)(args[1], args[2], args[3], args[4], args[5]);
 		break;
 
 	case 6:
-		ret = (*(_args_t(*)(_args_t, _args_t, _args_t, _args_t, _args_t, _args_t))CmdTbl[i].pfunc)(args[1], args[2], args[3], args[4], args[5], args[6]);
+		ret = (*(_args_t(*)(_args_t, _args_t, _args_t, _args_t, _args_t, _args_t))s_fcmd.p_func_tbl[i].pfunc)(args[1], args[2], args[3], args[4], args[5], args[6]);
 		break;
 
 	case 7:
-		ret = (*(_args_t(*)(_args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t))CmdTbl[i].pfunc)(args[1], args[2], args[3], args[4], args[5], args[6],
+		ret = (*(_args_t(*)(_args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t))s_fcmd.p_func_tbl[i].pfunc)(args[1], args[2], args[3], args[4], args[5], args[6],
 		        args[7]);
 		break;
 
 	case 8:
-		ret = (*(_args_t(*)(_args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t))CmdTbl[i].pfunc)(args[1], args[2], args[3], args[4], args[5],
+		ret = (*(_args_t(*)(_args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t))s_fcmd.p_func_tbl[i].pfunc)(args[1], args[2], args[3], args[4], args[5],
 		        args[6], args[7], args[8]);
 		break;
 
 	case 9:
-		ret = (*(_args_t(*)(_args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t))CmdTbl[i].pfunc)(args[1], args[2], args[3], args[4],
+		ret = (*(_args_t(*)(_args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t))s_fcmd.p_func_tbl[i].pfunc)(args[1], args[2], args[3], args[4],
 		        args[5], args[6], args[7], args[8], args[9]);
 		break;
 
 	case 10:
-		ret = (*(_args_t(*)(_args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t))CmdTbl[i].pfunc)(args[1], args[2], args[3],
+		ret = (*(_args_t(*)(_args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t, _args_t))s_fcmd.p_func_tbl[i].pfunc)(args[1], args[2], args[3],
 		        args[4], args[5], args[6], args[7], args[8], args[9], args[10]);
 		break;
 
@@ -611,4 +615,12 @@ void fcmd_exec(uint8_t *cmd)
 	{
 		PRINTF("=0x%08x,%d;\n", ret, ret);
 	}
+}
+
+void fcmd_register(CmdTbl_t *func_tbl, int func_tbl_size, CmdTbl_t *sys_tbl, int sys_tbl_size)
+{
+	s_fcmd.p_func_tbl = func_tbl;
+	s_fcmd.func_tbl_size = func_tbl_size;
+	s_fcmd.p_sys_tbl = sys_tbl;
+	s_fcmd.sys_tbl_size = sys_tbl_size;
 }

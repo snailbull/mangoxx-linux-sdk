@@ -1,5 +1,6 @@
-#include "fcmd.h"
-
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
 #include "cmd_mem.h"
 
 /*
@@ -32,7 +33,7 @@ void md(int addr, int elem_cnt, int elem_size)
 	line_count = (elem_cnt + line_elem - 1) / line_elem;//向上取整，不够一行算一行
 	line_remain = elem_cnt % line_elem;
 
-	PUTC('\n');
+	printf("\n");
 
 	for (j = 0; j < line_count; j++)
 	{
@@ -45,7 +46,7 @@ void md(int addr, int elem_cnt, int elem_size)
 		}
 
 		//dump a line, 16 bytes a line
-		PRINTF("%08X:", addr);		/* address */
+		printf("%08X:", addr);		/* address */
 
 		switch (elem_size)
 		{
@@ -53,34 +54,33 @@ void md(int addr, int elem_cnt, int elem_size)
 			bp = pcbuf;
 			for (i = 0; i < line_elem; i++)		/* Hexdecimal dump */
 			{
-				PRINTF(" %02X", bp[i]);
+				printf(" %02X", bp[i]);
 			}
 			break;
 		case 2://2
 			sp = (uint16_t *)pcbuf;
 			for (i = 0; i < line_elem; i++)		/* Hexdecimal dump */
 			{
-				PRINTF(" %04X", *sp++);
+				printf(" %04X", *sp++);
 			}
 			break;
 		case 4://4
 			lp = (uint32_t *)pcbuf;
 			for (i = 0; i < line_elem; i++)		/* Hexdecimal dump */
 			{
-				PRINTF(" %08X", lp[i]);
+				printf(" %08X", lp[i]);
 			}
 			break;
 		}
 
-		PUTC(' ');
-		PUTC(' ');
+		printf("  ");
 		bp = pcbuf;
 		for (i = 0; i < line_elem * elem_size; i++) /* ASCII dump */
 		{
-			PUTC((bp[i] >= ' ' && bp[i] <= '~') ? bp[i] : '.');
+			printf("%c", (bp[i] >= ' ' && bp[i] <= '~') ? bp[i] : '.');
 		}
 
-		PUTC('\n');
+		printf("\n");
 
 		addr += line_elem * elem_size;
 		pcbuf += line_elem * elem_size;
@@ -109,7 +109,7 @@ int cmp(void *mem1, void *mem2, int elem_cnt, int elem_size)
 
 			if (word1 != word2)
 			{
-				PRINTF("word at 0x%08x (0x%08x) "
+				printf("word at 0x%08x (0x%08x) "
 				       "!= word at 0x%08x (0x%08x)\n",
 				       (int)addr1, word1, (int)addr2, word2);
 				rcode = 1;
@@ -123,7 +123,7 @@ int cmp(void *mem1, void *mem2, int elem_cnt, int elem_size)
 
 			if (hword1 != hword2)
 			{
-				PRINTF("halfword at 0x%08x (0x%04x) "
+				printf("halfword at 0x%08x (0x%04x) "
 				       "!= halfword at 0x%08x (0x%04x)\n",
 				       (int)addr1, hword1, (int)addr2, hword2);
 				rcode = 1;
@@ -137,7 +137,7 @@ int cmp(void *mem1, void *mem2, int elem_cnt, int elem_size)
 
 			if (byte1 != byte2)
 			{
-				PRINTF("byte at 0x%08x (0x%02x) "
+				printf("byte at 0x%08x (0x%02x) "
 				       "!= byte at 0x%08x (0x%02x)\n",
 				       (int)addr1, byte1, (int)addr2, byte2);
 				rcode = 1;
@@ -150,7 +150,7 @@ int cmp(void *mem1, void *mem2, int elem_cnt, int elem_size)
 		addr1 += elem_size;
 		addr2 += elem_size;
 	}
-	PRINTF("Total of %d %s%s were the same\n",
+	printf("Total of %d %s%s were the same\n",
 	       ngood,
 	       (elem_size == 4) ? ("word") : ((elem_size == 2) ? "halfword" : "byte"),
 	       ngood == 1 ? "" : "s");
