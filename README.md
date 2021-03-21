@@ -6,11 +6,10 @@
 
 ## 使用说明
 
-这只是一个文档包， 你可以打印出[spec.md](spec.md)到输出窗口。
+编译apps
 
 ```sh
-$ standard-readme-spec
-# Prints out the standard-readme spec
+./build.sh [project_name] [1.0.0] [target]
 ```
 
 ## 相关仓库
